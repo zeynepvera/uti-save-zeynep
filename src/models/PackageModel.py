@@ -3,21 +3,35 @@ import numbers
 from pydantic import Field, validator
 from typing import List, Optional, Union, Any, Dict,Literal
 
-from sdks.novavision.src.base.model import Package, Images, Param, Inputs, Configs, Outputs, Response, Request,Output,Input,Config
+from sdks.novavision.src.base.model import Package, Image, Param, Inputs, Configs, Outputs, Response, Request,Output,Input,Config
+
 
 class OutputVideoUrl(Output):
     name: Literal["outputVideoUrl"] = "outputVideoUrl"
     value: str
     type: Literal["string"] = "string"
 
+
 class InputImage(Input):
     name: Literal["inputImage"] = "inputImage"
-    value: Images
-    type: Literal["Images"] = "Images"
+    value: Union[List[Image], Image]
+    type = "object"
+
+    @validator("type", pre=True, always=True)
+    def set_type_based_on_value(cls, value, values):
+        value = values.get('value')
+        if isinstance(value, Image):
+            return "object"
+        elif isinstance(value, list):
+            return "list"
+
+    class Config:
+        title = "Image"
 
 
 class VideoSaveInputs(Inputs):
     inputImage: InputImage
+
 
 class ConfigFps(Config):
     name: Literal["Fps"] = "Fps"
@@ -36,7 +50,8 @@ class ImageTitle(Config):
     field: Literal["textInput"] = "textInput"
 
     class Config:
-        title="Image Title"
+        title = "Image Title"
+
 
 class imageFieldWeb(Config):
     name: Literal["web"] = "web"
@@ -45,7 +60,8 @@ class imageFieldWeb(Config):
     field: Literal["option"] = "option"
 
     class Config:
-        title="Web"
+        title = "Web"
+
 
 class ImageFieldType(Config):
     name: Literal["imageFieldType"] = "imageFieldType"
@@ -54,12 +70,12 @@ class ImageFieldType(Config):
     field: Literal["dropdownlist"] = "dropdownlist"
 
     class Config:
-        title="Type"
+        title = "Type"
 
 
 class VideoSaveConfigs(Configs):
-    imageFieldType:ImageFieldType
-    imageTitle : ImageTitle
+    imageFieldType: ImageFieldType
+    imageTitle: ImageTitle
     configFps: ConfigFps
 
 
@@ -72,8 +88,10 @@ class VideoSaveRequest(Request):
             "target": "configs"
         }
 
+
 class VideoSaveOutputs(Outputs):
     outputVideoUrl: OutputVideoUrl
+
 
 class VideoSaveResponse(Response):
     outputs: VideoSaveOutputs
@@ -109,6 +127,7 @@ class ConfigExecutor(Config):
 
 class PackageConfigs(Configs):
     executor: ConfigExecutor
+
 
 class PackageModel(Package):
     configs: PackageConfigs

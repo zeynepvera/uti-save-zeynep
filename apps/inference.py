@@ -53,10 +53,10 @@ def inference():
 
     configFps = ConfigFps(value=2)
     imageTitle = ImageTitle(value="Save Video to Web")
-    imagefieldWeb=imageFieldWeb(value="web")
+    imagefieldWeb = imageFieldWeb(value="web")
     imageFieldtype = ImageFieldType(value=imagefieldWeb)
     imageSaveConfigs = VideoSaveConfigs(configFps=configFps,imageFieldType=imageFieldtype,imageTitle=imageTitle)
-    images = Images(name="Images", value=[image_list,image_list2,image_list3,image_list4,image_list5,image_list6,image_list7,image_list8], type="Images")
+    images = [image_list, image_list2, image_list3, image_list4, image_list5, image_list6, image_list7, image_list8]
     inputImage = InputImage(value=images)
     imageSaveInputs = VideoSaveInputs(inputImage=inputImage)
     imageSaveRequest = VideoSaveRequest(inputs=imageSaveInputs,configs=imageSaveConfigs)
