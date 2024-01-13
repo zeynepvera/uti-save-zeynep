@@ -13,51 +13,53 @@ from sdks.novavision.src.base.model import Image, Images, Request
 ENDPOINT_URL = "http://127.0.0.1:8000/api"
 
 def inference():
-    image_list = Image(name="image1", uID="323332", mimeType="image/jpg", encoding="base64",
-                       value=image.encode64(np.asarray(cv2.imread('/opt/project/components/VideoSave/resources/yorkshire_terrier.jpg')).astype(np.float32),'image/jpg'), type="Image")
+    image_list=[]
+    for i in range(40):
+        image_list.append(Image(name="image1", uID="323332", mimeType="image/jpg", encoding="base64",
+                       value=image.encode64(np.asarray(cv2.imread(f'/opt/project/components/VideoSave/resources/ezgif-frame-0{i+60}.jpg')).astype(np.float32),'image/jpg'), type="Image"))
 
-    image_list2 = Image(name="image2", uID="323332", mimeType="image/jpg", encoding="base64",
-                       value=image.encode64(
-                           np.asarray(cv2.imread('/opt/project/components/VideoSave/resources/yorkshire_terrier.jpg')).astype(
-                               np.float32), 'image/jpg'), type="Image")
+    # image_list2 = Image(name="image2", uID="323332", mimeType="image/jpg", encoding="base64",
+    #                    value=image.encode64(
+    #                        np.asarray(cv2.imread('/opt/project/components/VideoSave/resources/yorkshire_terrier.jpg')).astype(
+    #                            np.float32), 'image/jpg'), type="Image")
+    #
+    # image_list3 = Image(name="image3", uID="323332", mimeType="image/jpg", encoding="base64",
+    #                     value=image.encode64(
+    #                         np.asarray(cv2.imread('/opt/project/components/VideoSave/resources/yorkshire_terrier.jpg')).astype(
+    #                             np.float32), 'image/jpg'), type="Image")
+    #
+    # image_list4 = Image(name="image4", uID="323332", mimeType="image/jpg", encoding="base64",
+    #                     value=image.encode64(
+    #                         np.asarray(cv2.imread('/opt/project/components/VideoSave/resources/yorkshire_terrier.jpg')).astype(
+    #                             np.float32), 'image/jpg'), type="Image")
+    #
+    # image_list5 = Image(name="image5", uID="323332", mimeType="image/jpg", encoding="base64",
+    #                     value=image.encode64(
+    #                         np.asarray(cv2.imread('/opt/project/components/VideoSave/resources/yorkshire_terrier.jpg')).astype(
+    #                             np.float32), 'image/jpg'), type="Image")
+    #
+    # image_list6 = Image(name="image6", uID="323332", mimeType="image/jpg", encoding="base64",
+    #                     value=image.encode64(
+    #                         np.asarray(cv2.imread('/opt/project/components/VideoSave/resources/yorkshire_terrier.jpg')).astype(
+    #                             np.float32), 'image/jpg'), type="Image")
+    #
+    # image_list7 = Image(name="image7", uID="323332", mimeType="image/jpg", encoding="base64",
+    #                     value=image.encode64(
+    #                         np.asarray(cv2.imread('/opt/project/components/VideoSave/resources/yorkshire_terrier.jpg')).astype(
+    #                             np.float32), 'image/jpg'), type="Image")
+    #
+    # image_list8 = Image(name="image8", uID="323332", mimeType="image/jpg", encoding="base64",
+    #                     value=image.encode64(
+    #                         np.asarray(cv2.imread('/opt/project/components/VideoSave/resources/yorkshire_terrier.jpg')).astype(
+    #                             np.float32), 'image/jpg'), type="Image")
 
-    image_list3 = Image(name="image3", uID="323332", mimeType="image/jpg", encoding="base64",
-                        value=image.encode64(
-                            np.asarray(cv2.imread('/opt/project/components/VideoSave/resources/yorkshire_terrier.jpg')).astype(
-                                np.float32), 'image/jpg'), type="Image")
-
-    image_list4 = Image(name="image4", uID="323332", mimeType="image/jpg", encoding="base64",
-                        value=image.encode64(
-                            np.asarray(cv2.imread('/opt/project/components/VideoSave/resources/yorkshire_terrier.jpg')).astype(
-                                np.float32), 'image/jpg'), type="Image")
-
-    image_list5 = Image(name="image5", uID="323332", mimeType="image/jpg", encoding="base64",
-                        value=image.encode64(
-                            np.asarray(cv2.imread('/opt/project/components/VideoSave/resources/yorkshire_terrier.jpg')).astype(
-                                np.float32), 'image/jpg'), type="Image")
-
-    image_list6 = Image(name="image6", uID="323332", mimeType="image/jpg", encoding="base64",
-                        value=image.encode64(
-                            np.asarray(cv2.imread('/opt/project/components/VideoSave/resources/yorkshire_terrier.jpg')).astype(
-                                np.float32), 'image/jpg'), type="Image")
-
-    image_list7 = Image(name="image7", uID="323332", mimeType="image/jpg", encoding="base64",
-                        value=image.encode64(
-                            np.asarray(cv2.imread('/opt/project/components/VideoSave/resources/yorkshire_terrier.jpg')).astype(
-                                np.float32), 'image/jpg'), type="Image")
-
-    image_list8 = Image(name="image8", uID="323332", mimeType="image/jpg", encoding="base64",
-                        value=image.encode64(
-                            np.asarray(cv2.imread('/opt/project/components/VideoSave/resources/yorkshire_terrier.jpg')).astype(
-                                np.float32), 'image/jpg'), type="Image")
-
-    configFps = ConfigFps(value=2)
+    configFps = ConfigFps(value=60)
     imageTitle = ImageTitle(value="Save Video to Web")
     imagefieldWeb = imageFieldWeb(value="web")
     imageFieldtype = ImageFieldType(value=imagefieldWeb)
     imageSaveConfigs = VideoSaveConfigs(configFps=configFps,imageFieldType=imageFieldtype,imageTitle=imageTitle)
-    images = [image_list, image_list2, image_list3, image_list4, image_list5, image_list6, image_list7, image_list8]
-    inputImage = InputImage(value=images)
+    #images = [image_list0, image_list1, image_list2, image_list3, image_list4, image_list5, image_list6, image_list7, image_list8, image_list9, image_list10,image_list11, image_list12, image_list13, image_list14, image_list15, image_list16, image_list17, image_list18, image_list19, image_list20, image_list21, image_list22]
+    inputImage = InputImage(value=image_list)
     imageSaveInputs = VideoSaveInputs(inputImage=inputImage)
     imageSaveRequest = VideoSaveRequest(inputs=imageSaveInputs,configs=imageSaveConfigs)
     imageSaveExecutor = VideoSaveExecutor(value=imageSaveRequest)

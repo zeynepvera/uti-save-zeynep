@@ -34,16 +34,22 @@ class VideoSaveInputs(Inputs):
 
 
 class ConfigFps(Config):
+    """
+        It corresponds to the number of frames per second to be written.
+    """
     name: Literal["Fps"] = "Fps"
     value: int
     type: Literal["number"] = "number"
     field: Literal["textInput"] = "textInput"
 
     class Config:
-        title = "Fps"
+        title = "FPS"
 
 
 class ImageTitle(Config):
+    """
+        A custom name can be given to the file.
+    """
     name: Literal["imageTitle"] = "imageTitle"
     value: str
     type: Literal["string"] = "string"
@@ -64,13 +70,16 @@ class imageFieldWeb(Config):
 
 
 class ImageFieldType(Config):
+    """
+        The video can be saved to the cloud or local storage.
+    """
     name: Literal["imageFieldType"] = "imageFieldType"
     value: Union[imageFieldWeb]
     type: Literal["object"] = "object"
     field: Literal["dropdownlist"] = "dropdownlist"
 
     class Config:
-        title = "Type"
+        title = "Storage Type"
 
 
 class VideoSaveConfigs(Configs):

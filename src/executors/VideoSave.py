@@ -49,7 +49,11 @@ class VideoSave(Capsule):
                 images.append(img.value)
 
             height, width, layers = images[0].shape
-            video = cv2.VideoWriter("video.mp4", cv2.VideoWriter_fourcc(*'mp4v'), self.fps, (width, height))
+            #video = cv2.VideoWriter("video.mp4", cv2.VideoWriter_fourcc(*'mp4v'), self.fps, (width, height))
+
+            output_path = os.path.join("components/VideoSave/VideoImage", f"video_{self.fps}fps.mp4")
+            video = cv2.VideoWriter(output_path, cv2.VideoWriter_fourcc(*'mp4v'), self.fps, (width, height))
+
             for image in images:
                 if image.dtype != np.uint8:
                     image = cv2.convertScaleAbs(image)
@@ -58,7 +62,7 @@ class VideoSave(Capsule):
 
             shutil.rmtree("components/VideoSave/VideoImage")
 
-            api_endpoint = "https://dev.suite.novavision.ai/api/storage/default/upload?access-token=k40SygDWcgPaS3vtij3d8cRRsz8uQyhf"
+            api_endpoint = "http://suite.novavision.ai/api/storage/default/upload?access-token=k40SygDWcgPaS3vtij3d8cRRsz8uQyhf"
             files = {"file": (open("video.mp4", "rb"))}
             response = requests.post(api_endpoint, files=files, data={"title": self.title})
 
