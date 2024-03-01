@@ -3,139 +3,94 @@ import numbers
 from pydantic import Field, validator
 from typing import List, Optional, Union, Any, Dict,Literal
 
-from sdks.novavision.src.base.model import Package, Executor, ImageList, Param, Inputs, Configs, Outputs, Response, Request
+from sdks.novavision.src.base.model import Package, Image, Param, Inputs, Configs, Outputs, Response, Request,Output,Input,Config
 
 
-class InputImage(Param):
-    name: Literal["InputImage"] = "InputImage"
-    value: ImageList
-    type: Literal["imageList"] = "imageList"
-    field: Literal["img"] = "img"
-
-class ImageData(Param):
-    name: Literal["Imagedata"] = "Imagedata"
-    value: List
-    type: Literal["Imagedata"] = "Imagedata"
-    field: Literal["data"] = "data"
-
-class OutputData(Param):
-    name: Literal["OutputData"] = "OutputData"
-    value: ImageData
-    type: Literal["list"] = "list"
-    field: Literal["data"] = "data"
-
-
-class configTypeSegmentation(Param):
-    name: Literal["segmentation"] = "segmentation"
-    value: Literal["segmentation"] = "segmentation"
-    type: Literal["string"] = "string"
-    field: Literal["option"] = "option"
-
-
-
-class ConfigType(Param):
-    name: Literal["configType"] = "configType"
-    value:Union[configTypeSegmentation]
-    type: Literal["object"] = "object"
-    field: Literal["dependentDropdownlist"] = "dependentDropdownlist"
-
-
-
-class SegmentationInputs(Inputs):
-    inputImage: InputImage
+class OutputVideoUrl(Output):
+    name: Literal["outputVideoUrl"] = "outputVideoUrl"
     value: str
-    type: Literal["object"] = "object"
-    field: Literal["input"] = "input"
+    type: Literal["string"] = "string"
 
 
-class SegmentationConfigs(Configs):
-    configType: ConfigType
-    value: str = "Configs"
-    type: Literal["object"] = "object"
-    field: Literal["config"] = "config"
+class InputImage(Input):
+    name: Literal["inputImage"] = "inputImage"
+    value: Union[List[Image], Image]
+    type = "object"
 
-
-class SegmentationOutputs(Outputs):
-    OutputData: OutputData
-    type: Literal["object"] = "object"
-    field: Literal["output"] = "output"
-
-
-
-
-class SegmentationRequest(Request):
-    inputs: Optional[SegmentationInputs]
-    configs: SegmentationConfigs
-    class Config:
-        schema_extra = {
-            "target": "configs"
-        }
-
-
-class SegmentationResponse(Response):
-    outputs: SegmentationOutputs
-
-
-
-class SegmentationExecutor(Executor):
-    name = "Segmentation"
-    value: Union[SegmentationRequest, SegmentationResponse]
-    type: Literal["Segmentation"] = "Segmentation"
-    field: Literal["executor"] = "executor"
+    @validator("type", pre=True, always=True)
+    def set_type_based_on_value(cls, value, values):
+        value = values.get('value')
+        if isinstance(value, Image):
+            return "object"
+        elif isinstance(value, list):
+            return "list"
 
     class Config:
-        schema_extra = {
-            "target": {
-                "value": 0
-            }
-        }
+        title = "Image"
 
 
-class TrainOutputs(Outputs):
-    OutputData: OutputData
-    type: Literal["object"] = "object"
-    field: Literal["output"] = "output"
+class VideoSaveInputs(Inputs):
+    inputImage: InputImage
 
 
-class TrainResponse(Response):
-    outputs: TrainOutputs
-
-class BatchSize(Param):
-    name: Literal["BatchSize"] = "BatchSize"
-    value: int = Field(ge=1, le=100)
+class ConfigFps(Config):
+    """
+        It corresponds to the number of frames per second to be written.
+    """
+    name: Literal["Fps"] = "Fps"
+    value: int
     type: Literal["number"] = "number"
     field: Literal["textInput"] = "textInput"
 
-class Path(Param):
-    name: Literal["path"] = "path"
+    class Config:
+        title = "FPS"
+
+
+class ImageTitle(Config):
+    """
+        A custom name can be given to the file.
+    """
+    name: Literal["imageTitle"] = "imageTitle"
     value: str
     type: Literal["string"] = "string"
     field: Literal["textInput"] = "textInput"
 
-class ConfigPath(Param):
-    name: Literal["configPath"] = "configPath"
-    value: Union[Path]
-    type: Literal["object"] = "object"
+    class Config:
+        title = "Image Title"
+
+
+class imageFieldWeb(Config):
+    name: Literal["web"] = "web"
+    value: Literal["web"] = "web"
+    type: Literal["string"] = "string"
     field: Literal["option"] = "option"
 
+    class Config:
+        title = "Web"
 
-class ConfigBatchSize(Param):
-    name: Literal["ConfigBatchSize"] = "ConfigBatchSize"
-    value: Union[BatchSize]
+
+class ImageFieldType(Config):
+    """
+        The video can be saved to the cloud or local storage.
+    """
+    name: Literal["imageFieldType"] = "imageFieldType"
+    value: Union[imageFieldWeb]
     type: Literal["object"] = "object"
-    field: Literal["option"] = "option"
+    field: Literal["dropdownlist"] = "dropdownlist"
+
+    class Config:
+        title = "Storage Type"
 
 
-class TrainConfigs(Configs):
-    configPath: ConfigPath
-    BatchSize: ConfigBatchSize
-    value: str = "Configs"
-    type: Literal["object"] = "object"
-    field: Literal["config"] = "config"
+class VideoSaveConfigs(Configs):
+    imageFieldType: ImageFieldType
+    imageTitle: ImageTitle
+    configFps: ConfigFps
 
 
-class TrainRequest(Request):
-    configs: TrainConfigs
+class VideoSaveRequest(Request):
+    inputs: Optional[VideoSaveInputs]
+    configs: VideoSaveConfigs
 
     class Config:
         schema_extra = {
@@ -143,43 +98,48 @@ class TrainRequest(Request):
         }
 
 
-class TrainExecutor(Executor):
-    name = "Train"
-    value: Union[TrainRequest, TrainResponse]
-    type: Literal["Train"] = "Train"
-    field: Literal["executor"] = "executor"
+class VideoSaveOutputs(Outputs):
+    outputVideoUrl: OutputVideoUrl
+
+
+class VideoSaveResponse(Response):
+    outputs: VideoSaveOutputs
+
+
+class VideoSaveExecutor(Config):
+    name: Literal["VideoSave"] = "VideoSave"
+    value: Union[VideoSaveRequest, VideoSaveResponse]
+    type: Literal["object"] = "object"
+    field: Literal["option"] = "option"
 
     class Config:
+        title = "Video Save"
         schema_extra = {
             "target": {
                 "value": 0
             }
         }
 
-class PackageExecutor(Executor):
-    name = "executor"
-    value: Union[SegmentationExecutor,TrainExecutor]
-    type:Literal["executor"] = "executor"
+
+class ConfigExecutor(Config):
+    name: Literal["ConfigExecutor"] = "ConfigExecutor"
+    value: Union[VideoSaveExecutor]
+    type: Literal["executor"] = "executor"
     field: Literal["dependentDropdownlist"] = "dependentDropdownlist"
 
-
-
-class PackageModel(Package):
-    type = "capsule"
-    name = "Segmentation"
-    uID = "1221112"
-    executor: PackageExecutor
-    field: Literal["executor"] = "executor"
-
     class Config:
+        title = "Task"
         schema_extra = {
-            "target": "executor"
+            "target": "value"
         }
 
 
-class RequestModel(Request):
-    package: PackageModel
+class PackageConfigs(Configs):
+    executor: ConfigExecutor
 
 
-class ResponseModel(Response):
-    package: PackageModel
+class PackageModel(Package):
+    configs: PackageConfigs
+    type: Literal["component"] = "component"
+    name: Literal["VideoSave"] = "VideoSave"
+    uID = "1221112"
