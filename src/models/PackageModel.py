@@ -44,7 +44,6 @@ class ConfigFps(Config):
     type: Literal["number"] = "number"
     field: Literal["textInput"] = "textInput"
 
-    model_config = ConfigDict(title="FPS")
 
 
 class ImageTitle(Config):
@@ -56,7 +55,6 @@ class ImageTitle(Config):
     type: Literal["string"] = "string"
     field: Literal["textInput"] = "textInput"
 
-    model_config = ConfigDict(title="Image Title")
 
 
 class imageFieldWeb(Config):
@@ -142,5 +140,5 @@ class PackageConfigs(Configs):
 class PackageModel(Package):
     configs: PackageConfigs
     type: Literal["component"] = "component"
-    name: Literal["VideoSave"] = "VideoSave"
+    name: Literal["SaveZeynep"] = "SaveZeynep"
     uID: str = "1221112"
