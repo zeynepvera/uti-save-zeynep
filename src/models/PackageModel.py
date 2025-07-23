@@ -140,5 +140,5 @@ class PackageConfigs(Configs):
 class PackageModel(Package):
     configs: PackageConfigs
     type: Literal["component"] = "component"
-    name: Literal["VideoSave"] = "VideoSave"
+    name: Literal["SaveZeynep"] = "SaveZeynep"
     uID: str = "1221112"
