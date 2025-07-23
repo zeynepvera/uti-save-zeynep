@@ -1,9 +1,9 @@
 import numbers
 
-from pydantic import Field, validator
-from typing import List, Optional, Union, Any, Dict,Literal
+from pydantic import Field, field_validator, ConfigDict
+from typing import List, Optional, Union, Any, Dict, Literal
 
-from sdks.novavision.src.base.model import Package, Image, Param, Inputs, Configs, Outputs, Response, Request,Output,Input,Config
+from sdks.novavision.src.base.model import Package, Image, Param, Inputs, Configs, Outputs, Response, Request, Output, Input, Config
 
 
 class OutputVideoUrl(Output):
@@ -15,18 +15,20 @@ class OutputVideoUrl(Output):
 class InputImage(Input):
     name: Literal["inputImage"] = "inputImage"
     value: Union[List[Image], Image]
-    type = "object"
+    type: str = "object"
 
-    @validator("type", pre=True, always=True)
-    def set_type_based_on_value(cls, value, values):
-        value = values.get('value')
-        if isinstance(value, Image):
-            return "object"
-        elif isinstance(value, list):
-            return "list"
+    @field_validator("type", mode="before")
+    @classmethod
+    def set_type_based_on_value(cls, v, info):
+        if hasattr(info, 'data') and 'value' in info.data:
+            value = info.data['value']
+            if isinstance(value, Image):
+                return "object"
+            elif isinstance(value, list):
+                return "list"
+        return "object"
 
-    class Config:
-        title = "Image"
+    model_config = ConfigDict(title="Image")
 
 
 class VideoSaveInputs(Inputs):
@@ -42,8 +44,6 @@ class ConfigFps(Config):
     type: Literal["number"] = "number"
     field: Literal["textInput"] = "textInput"
 
-    class Config:
-        title = "FPS"
 
 
 class ImageTitle(Config):
@@ -55,8 +55,6 @@ class ImageTitle(Config):
     type: Literal["string"] = "string"
     field: Literal["textInput"] = "textInput"
 
-    class Config:
-        title = "Image Title"
 
 
 class imageFieldWeb(Config):
@@ -65,8 +63,7 @@ class imageFieldWeb(Config):
     type: Literal["string"] = "string"
     field: Literal["option"] = "option"
 
-    class Config:
-        title = "Web"
+    model_config = ConfigDict(title="Web")
 
 
 class ImageFieldType(Config):
@@ -78,8 +75,7 @@ class ImageFieldType(Config):
     type: Literal["object"] = "object"
     field: Literal["dropdownlist"] = "dropdownlist"
 
-    class Config:
-        title = "Storage Type"
+    model_config = ConfigDict(title="Storage Type")
 
 
 class VideoSaveConfigs(Configs):
@@ -92,10 +88,11 @@ class VideoSaveRequest(Request):
     inputs: Optional[VideoSaveInputs]
     configs: VideoSaveConfigs
 
-    class Config:
-        schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "target": "configs"
         }
+    )
 
 
 class VideoSaveOutputs(Outputs):
@@ -112,13 +109,14 @@ class VideoSaveExecutor(Config):
     type: Literal["object"] = "object"
     field: Literal["option"] = "option"
 
-    class Config:
-        title = "Video Save"
-        schema_extra = {
+    model_config = ConfigDict(
+        title="Video Save",
+        json_schema_extra={
             "target": {
                 "value": 0
             }
         }
+    )
 
 
 class ConfigExecutor(Config):
@@ -127,11 +125,12 @@ class ConfigExecutor(Config):
     type: Literal["executor"] = "executor"
     field: Literal["dependentDropdownlist"] = "dependentDropdownlist"
 
-    class Config:
-        title = "Task"
-        schema_extra = {
+    model_config = ConfigDict(
+        title="Task",
+        json_schema_extra={
             "target": "value"
         }
+    )
 
 
 class PackageConfigs(Configs):
@@ -142,4 +141,4 @@ class PackageModel(Package):
     configs: PackageConfigs
     type: Literal["component"] = "component"
     name: Literal["VideoSave"] = "VideoSave"
-    uID = "1221112"
+    uID: str = "1221112"
