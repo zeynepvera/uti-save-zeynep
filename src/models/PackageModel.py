@@ -24,13 +24,6 @@ class StreamUrl(Config):
         return v
 
 
-class BufferSize(Config):
-    name: Literal["bufferSize"] = "bufferSize"
-    value: int = Field(default=100, ge=10, le=1000)
-    type: Literal["number"] = "number"
-    field: Literal["textInput"] = "textInput"
-
-
 class RecordDuration(Config):
     name: Literal["recordDuration"] = "recordDuration"
     value: int = Field(default=10, ge=1, le=300)
@@ -52,60 +45,11 @@ class ConfigFps(Config):
     field: Literal["textInput"] = "textInput"
 
 
-class UploadUrl(Config):
-    """
-    Upload API endpoint to save the video to cloud storage.
-    Only required when storage type is 'cloud'.
-    """
-    name: Literal["uploadUrl"] = "uploadUrl"
-    value: Optional[str] = None  # Artık opsiyonel
-    type: Literal["string"] = "string"
-    field: Literal["textInput"] = "textInput"
-
-    @validator('value')
-    def validate_upload_url(cls, v):
-        if v and not v.startswith(('http://', 'https://')):
-            raise ValueError('Upload URL geçerli bir HTTP/HTTPS URL olmalı')
-        return v
-
-
-
-
-class StorageTypeLocal(Config):
-    name: Literal["local"] = "local"
-    value: Literal["local"] = "local"
-    type: Literal["string"] = "string"
-    field: Literal["option"] = "option"
-
-    model_config = ConfigDict(title="Local Storage")
-
-
-class StorageTypeCloud(Config):
-    name: Literal["cloud"] = "cloud"
-    value: Literal["cloud"] = "cloud"
-    type: Literal["string"] = "string"
-    field: Literal["option"] = "option"
-
-    model_config = ConfigDict(title="Cloud Storage")
-
-
-class StorageType(Config):
-    name: Literal["storageType"] = "storageType"
-    value: Union[StorageTypeLocal, StorageTypeCloud] = Field(default_factory=lambda: StorageTypeCloud())
-    type: Literal["object"] = "object"
-    field: Literal["dropdownlist"] = "dropdownlist"
-
-    model_config = ConfigDict(title="Storage Type")
-
-
 class VideoSaveConfigs(Configs):
     streamUrl: StreamUrl
-    bufferSize: BufferSize
     recordDuration: RecordDuration
     imageTitle: ImageTitle
     configFps: ConfigFps
-    storageType: StorageType
-    uploadUrl: Optional[UploadUrl] = None
 
 
 class VideoSaveRequest(Request):

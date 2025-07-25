@@ -8,7 +8,6 @@ import uuid
 import requests
 import shutil
 import datetime
-from collections import deque
 import threading
 import time
 
@@ -30,24 +29,14 @@ class VideoSave(Component):
         self.request.model = PackageModel(**(self.request.data))
 
         self.stream_url = self.request.get_param("streamUrl")
-        self.buffer_size = self.request.get_param("bufferSize")
         self.record_duration = self.request.get_param("recordDuration")
         self.title = self.request.get_param("imageTitle")
-        self.fps = self.request.get_param("configFps")
-        self.storage_type = self.request.get_param("storageType")
-
-        if self.storage_type and self.storage_type.get("value") == "cloud":
-            self.upload_url = self.request.get_param("uploadUrl")
-            if not self.upload_url:
-                raise ValueError(" for Cloud storage uploadUrlis necessary  ")
-        else:
-            self.upload_url = None
+        self.user_fps = self.request.get_param("configFps")
 
         if not self.stream_url:
             raise ValueError("streamUrl parametresi zorunludur.")
 
-        self.buffer_size = self.buffer_size or 100
-        self.fps = self.fps or 25
+        self.user_fps = self.user_fps or 25
         self.record_duration = self.record_duration or 10
         self.title = self.title or "untitled_video"
 
@@ -77,26 +66,47 @@ class VideoSave(Component):
             return False, f"Local storage dizin oluşturulamadı: {str(e)}"
 
     def _cleanup_temp_dir(self):
-        """Geçici dizini temizle"""
         try:
             if os.path.exists(self.temp_dir):
                 shutil.rmtree(self.temp_dir)
         except Exception as e:
             print(f"Geçici dizin temizlenirken hata: {e}")
 
+    def get_stream_fps_and_determine_final_fps(self, cap):
+        try:
+            system_fps = cap.get(cv2.CAP_PROP_FPS)
+
+            if system_fps <= 0:
+                return None, "Stream'in FPS değeri tespit edilemedi"
+
+            final_fps = min(self.user_fps, system_fps)
+
+            return final_fps, f"Sistem FPS: {system_fps}, Kullanıcı FPS: {self.user_fps}, Final FPS: {final_fps}"
+
+        except Exception as e:
+            return None, f"FPS belirleme hatası: {str(e)}"
+
     def capture_stream_frames(self):
-        """MJPEG stream'den frame'leri yakala"""
         cap = None
         try:
             cap = cv2.VideoCapture(self.stream_url)
 
             if not cap.isOpened():
-                return None, "Stream'e bağlanılamadı."
+                return None, None, "Stream'e bağlanılamadı."
 
-            frame_buffer = deque(maxlen=self.buffer_size)
+            final_fps, fps_msg = self.get_stream_fps_and_determine_final_fps(cap)
+            if final_fps is None:
+                return None, None, fps_msg
+
+            print(fps_msg)
+
+            frames = []
             start_time = time.time()
+            frame_interval = 1.0 / final_fps
+            last_frame_time = 0
 
             print(f"Stream yakalanıyor... {self.record_duration} saniye kayıt yapılacak.")
+            print(f"Final FPS: {final_fps}")
 
             while True:
                 ret, frame = cap.read()
@@ -104,23 +114,27 @@ class VideoSave(Component):
                     print("Frame okunamadı, stream sona erdi.")
                     break
 
-                frame_buffer.append(frame.copy())
+                current_time = time.time()
 
-                if time.time() - start_time >= self.record_duration:
+                if current_time - last_frame_time >= frame_interval:
+                    frames.append(frame.copy())
+                    last_frame_time = current_time
+
+                if current_time - start_time >= self.record_duration:
                     break
 
-            if len(frame_buffer) == 0:
-                return None, "Hiç frame yakalanamadı."
+            if len(frames) == 0:
+                return None, None, "Hiç frame yakalanamadı."
 
-            return list(frame_buffer), f"{len(frame_buffer)} frame başarıyla yakalandı."
+            return frames, final_fps, f"{len(frames)} frame başarıyla yakalandı. ({fps_msg})"
 
         except Exception as e:
-            return None, f"Stream yakalama hatası: {str(e)}"
+            return None, None, f"Stream yakalama hatası: {str(e)}"
         finally:
             if cap is not None:
                 cap.release()
 
-    def create_video_from_frames(self, frames):
+    def create_video_from_frames(self, frames, fps):
         if not frames:
             return None, "Frame listesi boş."
 
@@ -129,19 +143,16 @@ class VideoSave(Component):
             return None, msg
 
         try:
-            # Video özellikleri
             height, width, _ = frames[0].shape
             timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
             output_path = os.path.join(self.temp_dir, f"{self.title}_{timestamp}.mp4")
 
-            # Video writer oluştur
             fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-            video_writer = cv2.VideoWriter(output_path, fourcc, self.fps, (width, height))
+            video_writer = cv2.VideoWriter(output_path, fourcc, fps, (width, height))
 
             if not video_writer.isOpened():
                 return None, "Video writer başlatılamadı."
 
-            # Frame'leri videoya yaz
             for frame in frames:
                 if frame.dtype != np.uint8:
                     frame = cv2.convertScaleAbs(frame)
@@ -152,7 +163,7 @@ class VideoSave(Component):
             if not os.path.exists(output_path):
                 return None, "Video dosyası oluşturulamadı."
 
-            return output_path, f"Video oluşturuldu: {output_path}"
+            return output_path, f"Video oluşturuldu: {output_path} (FPS: {fps})"
 
         except Exception as e:
             return None, f"Video oluşturma hatası: {str(e)}"
@@ -160,16 +171,14 @@ class VideoSave(Component):
     def save_video_locally(self, video_path):
         """Videoyu local storage'a kaydet"""
         try:
-            # Local storage dizini oluştur
             success, msg = self._ensure_local_storage_dir()
             if not success:
                 return False, msg
 
-            # Hedef dosya yolu
+
             video_filename = os.path.basename(video_path)
             local_path = os.path.join(self.local_storage_dir, video_filename)
 
-            # Dosyayı kopyala
             shutil.copy2(video_path, local_path)
 
             if os.path.exists(local_path):
@@ -180,43 +189,26 @@ class VideoSave(Component):
         except Exception as e:
             return False, f"Local kaydetme hatası: {str(e)}"
 
-    def upload_to_cloud(self, video_path):
-        """Videoyu buluta yükle (şimdilik placeholder)"""
-        # TODO: Cloud storage implementasyonu
-        return False, "Cloud storage henüz implement edilmedi"
-
     def run(self):
         message = ""
         success = False
 
         try:
-            # Stream yakalama modunda çalış
-            frames, capture_msg = self.capture_stream_frames()
+            frames, final_fps, capture_msg = self.capture_stream_frames()
 
             if frames is None:
                 message = f"❌ {capture_msg}"
             else:
-                # Video oluştur
-                video_path, create_msg = self.create_video_from_frames(frames)
+                video_path, create_msg = self.create_video_from_frames(frames, final_fps)
 
                 if video_path:
-                    # Storage type'a göre kaydetme
-                    storage_type_value = "local"  # Default
-                    if self.storage_type and isinstance(self.storage_type, dict):
-                        storage_type_value = self.storage_type.get("value", "local")
-
-                    if storage_type_value == "cloud":
-                        save_success, save_msg = self.upload_to_cloud(video_path)
-                        save_type = "buluta yüklendi"
-                    else:
-                        save_success, save_msg = self.save_video_locally(video_path)
-                        save_type = "local'e kaydedildi"
+                    save_success, save_msg = self.save_video_locally(video_path)
 
                     if save_success:
-                        message = f" {capture_msg} | {create_msg} | Video {save_type}: {save_msg}"
+                        message = f"✅ {capture_msg} | {create_msg} | {save_msg}"
                         success = True
                     else:
-                        message = f"️ Video oluşturuldu ancak kaydetme başarısız: {save_msg}"
+                        message = f" Video oluşturuldu ancak kaydetme başarısız: {save_msg}"
                 else:
                     message = f"❌ {create_msg}"
 
