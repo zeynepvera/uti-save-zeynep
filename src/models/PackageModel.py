@@ -1,7 +1,6 @@
 from pydantic import Field, ConfigDict, field_validator
-from typing import List, Optional, Union, Literal
-from sdks.novavision.src.base.model import Package, Image, Param, Inputs, Configs, Outputs, Response, Request, Output, \
-    Input, Config
+from typing import Union, Literal
+from sdks.novavision.src.base.model import Package, Configs, Response, Request, Output, Config
 
 
 class OutputVideoUrl(Output):
@@ -21,7 +20,7 @@ class StreamUrl(Config):
     def validate_stream_url(cls, v):
         if not v or not isinstance(v, str):
             raise ValueError('Stream URL boş olamaz')
-        if not v.startswith(('http://', 'https://', 'rtmp://', 'rtsp://')):
+        if not v.lower().startswith(('http://', 'https://', 'rtmp://', 'rtsp://')):
             raise ValueError('Stream URL geçerli bir protokol ile başlamalı (http, https, rtmp, rtsp)')
         return v
 
@@ -47,19 +46,11 @@ class ConfigFps(Config):
     field: Literal["textInput"] = "textInput"
 
 
-class TargetDirectory(Config):
-    name: Literal["targetDirectory"] = "targetDirectory"
-    value: Literal["local", "storage"] = "local"
-    type: Literal["string"] = "string"
-    field: Literal["dropdown"] = "dropdown"
-
-
 class VideoSaveConfigs(Configs):
     streamUrl: StreamUrl
     recordDuration: RecordDuration
     imageTitle: ImageTitle
     configFps: ConfigFps
-    targetDirectory: TargetDirectory
 
 
 class VideoSaveRequest(Request):
@@ -71,7 +62,7 @@ class VideoSaveRequest(Request):
     )
 
 
-class VideoSaveOutputs(Outputs):
+class VideoSaveOutputs(Output):
     outputVideoUrl: OutputVideoUrl
 
 

@@ -28,26 +28,19 @@ class VideoSave(Component):
         self.request.model = PackageModel(**(self.request.data))
 
         self.stream_url = self.request.get_param("streamUrl")
-        self.record_duration = self.request.get_param("recordDuration")
-        self.title = self.request.get_param("imageTitle")
-        self.user_fps = self.request.get_param("configFps")
-        self.target_directory = self.request.get_param("targetDirectory")
+        self.record_duration = self.request.get_param("recordDuration") or 10
+        self.title = self.request.get_param("imageTitle") or "untitled_video"
+        self.user_fps = self.request.get_param("configFps") or 25
 
         if not self.stream_url:
             raise ValueError("streamUrl parametresi zorunludur.")
-
-        self.user_fps = self.user_fps or 25
-        self.record_duration = self.record_duration or 10
-        self.title = self.title or "untitled_video"
-        self.target_directory = self.target_directory or "local"
 
         self.temp_dir = "components/SaveZeynep/VideoTemp"
         self.local_storage_dir = "components/SaveZeynep/SavedVideos"
 
     @staticmethod
     def bootstrap():
-        model = {"models": " "}
-        return model
+        return {"models": " "}
 
     def _ensure_temp_dir(self):
         try:
@@ -76,11 +69,12 @@ class VideoSave(Component):
         try:
             system_fps = cap.get(cv2.CAP_PROP_FPS)
             if system_fps <= 0:
-                return None, "Stream'in FPS değeri tespit edilemedi"
+                final_fps = self.user_fps
+                return final_fps, f"Stream'in FPS değeri tespit edilemedi, kullanıcı FPS ({self.user_fps}) kullanılacak."
             final_fps = min(self.user_fps, system_fps)
             return final_fps, f"Sistem FPS: {system_fps}, Kullanıcı FPS: {self.user_fps}, Final FPS: {final_fps}"
         except Exception as e:
-            return None, f"FPS belirleme hatası: {str(e)}"
+            return self.user_fps, f"FPS belirleme hatası, kullanıcı FPS kullanılacak: {str(e)}"
 
     def capture_stream_frames(self):
         cap = None
@@ -89,13 +83,9 @@ class VideoSave(Component):
             if not cap.isOpened():
                 return None, None, "Stream'e bağlanılamadı."
             final_fps, fps_msg = self.get_stream_fps_and_determine_final_fps(cap)
-            if final_fps is None:
-                return None, None, fps_msg
-
-            print(fps_msg)
+            frame_interval = 1.0 / final_fps
             frames = []
             start_time = time.time()
-            frame_interval = 1.0 / final_fps
             last_frame_time = 0
 
             while True:
@@ -109,9 +99,8 @@ class VideoSave(Component):
                 if current_time - start_time >= self.record_duration:
                     break
 
-            if len(frames) == 0:
+            if not frames:
                 return None, None, "Hiç frame yakalanamadı."
-
             return frames, final_fps, f"{len(frames)} frame başarıyla yakalandı. ({fps_msg})"
         except Exception as e:
             return None, None, f"Stream yakalama hatası: {str(e)}"
@@ -160,35 +149,8 @@ class VideoSave(Component):
         except Exception as e:
             return False, f"Error saving video locally: {str(e)}"
 
-    def save_video_to_storage(self, video_path):
-        try:
-            if not hasattr(self, 'environment') or not self.environment:
-                return False, "Environment config not found"
-            api_endpoint = f"{self.environment.web_api}/storage/default/upload?access-token={self.environment.device_access_token}"
-            timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-            final_filename = f"{self.title}_{timestamp}.mp4"
-            with open(video_path, "rb") as f:
-                files = {"file": f}
-                data = {"title": final_filename}
-                response = requests.post(api_endpoint, files=files, data=data, timeout=60)
-            if response.status_code == 200:
-                try:
-                    file_url = response.json().get('url', 'Upload successful')
-                    return True, f"Video uploaded successfully: {file_url}"
-                except:
-                    return True, f"Video uploaded successfully: {response.text}"
-            else:
-                return False, f"Storage upload failed: {response.status_code} - {response.text}"
-        except Exception as e:
-            return False, f"Error uploading video to storage: {str(e)}"
-
     def save_video(self, video_path):
-        if self.target_directory == "local":
-            return self.save_video_locally(video_path)
-        elif self.target_directory == "storage":
-            return self.save_video_to_storage(video_path)
-        else:
-            return False, f"Invalid target directory: {self.target_directory}"
+        return self.save_video_locally(video_path)
 
     def run(self):
         message = ""
@@ -221,3 +183,4 @@ class VideoSave(Component):
             return Response(model=packageModel).response()
         except Exception as e:
             return Response(model={"error": f"Response creation error: {str(e)}", "success": False}).response()
+
