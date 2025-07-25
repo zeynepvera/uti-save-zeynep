@@ -1,9 +1,8 @@
-import numbers
+from pydantic import Field, ConfigDict, validator
+from typing import List, Optional, Union, Literal
 
-from pydantic import Field, field_validator, ConfigDict
-from typing import List, Optional, Union, Any, Dict, Literal
-
-from sdks.novavision.src.base.model import Package, Image, Param, Inputs, Configs, Outputs, Response, Request, Output, Input, Config
+from sdks.novavision.src.base.model import Package, Image, Param, Inputs, Configs, Outputs, Response, Request, Output, \
+    Input, Config
 
 
 class OutputVideoUrl(Output):
@@ -12,66 +11,87 @@ class OutputVideoUrl(Output):
     type: Literal["string"] = "string"
 
 
-class InputImage(Input):
-    name: Literal["inputImage"] = "inputImage"
-    value: Union[List[Image], Image]
-    type: str = "object"
-
-    @field_validator("type", mode="before")
-    @classmethod
-    def set_type_based_on_value(cls, v, info):
-        if hasattr(info, 'data') and 'value' in info.data:
-            value = info.data['value']
-            if isinstance(value, Image):
-                return "object"
-            elif isinstance(value, list):
-                return "list"
-        return "object"
-
-    model_config = ConfigDict(title="Image")
-
-
-class VideoSaveInputs(Inputs):
-    inputImage: InputImage
-
-
-class ConfigFps(Config):
-    """
-        It corresponds to the number of frames per second to be written.
-    """
-    name: Literal["Fps"] = "Fps"
-    value: int
-    type: Literal["number"] = "number"
-    field: Literal["textInput"] = "textInput"
-
-
-
-class ImageTitle(Config):
-    """
-        A custom name can be given to the file.
-    """
-    name: Literal["imageTitle"] = "imageTitle"
+class StreamUrl(Config):
+    name: Literal["streamUrl"] = "streamUrl"
     value: str
     type: Literal["string"] = "string"
     field: Literal["textInput"] = "textInput"
 
+    @validator('value')
+    def validate_stream_url(cls, v):
+        if not v.startswith(('http://', 'https://', 'rtmp://')):
+            raise ValueError('Stream URL geçerli bir protokol ile başlamalı (http, https, rtmp)')
+        return v
 
 
-class imageFieldWeb(Config):
-    name: Literal["web"] = "web"
-    value: Literal["web"] = "web"
+class BufferSize(Config):
+    name: Literal["bufferSize"] = "bufferSize"
+    value: int = Field(default=100, ge=10, le=1000)
+    type: Literal["number"] = "number"
+    field: Literal["textInput"] = "textInput"
+
+
+class RecordDuration(Config):
+    name: Literal["recordDuration"] = "recordDuration"
+    value: int = Field(default=10, ge=1, le=300)
+    type: Literal["number"] = "number"
+    field: Literal["textInput"] = "textInput"
+
+
+class ImageTitle(Config):
+    name: Literal["imageTitle"] = "imageTitle"
+    value: str = Field(default="untitled_video", min_length=1, max_length=100)
+    type: Literal["string"] = "string"
+    field: Literal["textInput"] = "textInput"
+
+
+class ConfigFps(Config):
+    name: Literal["configFps"] = "configFps"
+    value: int = Field(default=25, ge=1, le=60)  # Min 1 FPS, Max 60 FPS
+    type: Literal["number"] = "number"
+    field: Literal["textInput"] = "textInput"
+
+
+class UploadUrl(Config):
+    """
+    Upload API endpoint to save the video to cloud storage.
+    Only required when storage type is 'cloud'.
+    """
+    name: Literal["uploadUrl"] = "uploadUrl"
+    value: Optional[str] = None  # Artık opsiyonel
+    type: Literal["string"] = "string"
+    field: Literal["textInput"] = "textInput"
+
+    @validator('value')
+    def validate_upload_url(cls, v):
+        if v and not v.startswith(('http://', 'https://')):
+            raise ValueError('Upload URL geçerli bir HTTP/HTTPS URL olmalı')
+        return v
+
+
+
+
+class StorageTypeLocal(Config):
+    name: Literal["local"] = "local"
+    value: Literal["local"] = "local"
     type: Literal["string"] = "string"
     field: Literal["option"] = "option"
 
-    model_config = ConfigDict(title="Web")
+    model_config = ConfigDict(title="Local Storage")
 
 
-class ImageFieldType(Config):
-    """
-        The video can be saved to the cloud or local storage.
-    """
-    name: Literal["imageFieldType"] = "imageFieldType"
-    value: Union[imageFieldWeb]
+class StorageTypeCloud(Config):
+    name: Literal["cloud"] = "cloud"
+    value: Literal["cloud"] = "cloud"
+    type: Literal["string"] = "string"
+    field: Literal["option"] = "option"
+
+    model_config = ConfigDict(title="Cloud Storage")
+
+
+class StorageType(Config):
+    name: Literal["storageType"] = "storageType"
+    value: Union[StorageTypeLocal, StorageTypeCloud] = Field(default_factory=lambda: StorageTypeCloud())
     type: Literal["object"] = "object"
     field: Literal["dropdownlist"] = "dropdownlist"
 
@@ -79,13 +99,16 @@ class ImageFieldType(Config):
 
 
 class VideoSaveConfigs(Configs):
-    imageFieldType: ImageFieldType
+    streamUrl: StreamUrl
+    bufferSize: BufferSize
+    recordDuration: RecordDuration
     imageTitle: ImageTitle
     configFps: ConfigFps
+    storageType: StorageType
+    uploadUrl: Optional[UploadUrl] = None
 
 
 class VideoSaveRequest(Request):
-    inputs: Optional[VideoSaveInputs]
     configs: VideoSaveConfigs
 
     model_config = ConfigDict(
@@ -121,7 +144,7 @@ class VideoSave(Config):
 
 class ConfigExecutor(Config):
     name: Literal["ConfigExecutor"] = "ConfigExecutor"
-    value: Union[VideoSave]
+    value: VideoSave
     type: Literal["executor"] = "executor"
     field: Literal["dependentDropdownlist"] = "dependentDropdownlist"
 
@@ -141,4 +164,4 @@ class PackageModel(Package):
     configs: PackageConfigs
     type: Literal["component"] = "component"
     name: Literal["SaveZeynep"] = "SaveZeynep"
-    uID: str = "1221112"
+    uID: str = Field(default="1221112")
