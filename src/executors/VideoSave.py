@@ -40,8 +40,8 @@ class VideoSave(Component):
         self.record_duration = self.record_duration or 10
         self.title = self.title or "untitled_video"
 
-        self.temp_dir = os.path.join("components", "SaveZeynep", "VideoTemp")
-        self.local_storage_dir = os.path.join("components", "SaveZeynep", "SavedVideos")
+        self.temp_dir = "components/SaveZeynep/VideoTemp"
+        self.local_storage_dir = "components/SaveZeynep/SavedVideos"
 
     @staticmethod
     def bootstrap():
@@ -178,6 +178,8 @@ class VideoSave(Component):
 
             video_filename = os.path.basename(video_path)
             local_path = os.path.join(self.local_storage_dir, video_filename)
+
+            print(f"Video kaydedilecek tam yol: {os.path.abspath(local_path)}")
 
             shutil.copy2(video_path, local_path)
 
