@@ -40,8 +40,8 @@ class VideoSave(Component):
         self.record_duration = self.record_duration or 10
         self.title = self.title or "untitled_video"
 
-        self.temp_dir = "components/VideoSave/VideoTemp"
-        self.local_storage_dir = "components/VideoSave/SavedVideos"
+        self.temp_dir = os.path.join("components", "SaveZeynep", "VideoTemp")
+        self.local_storage_dir = os.path.join("components", "SaveZeynep", "SavedVideos")
 
     @staticmethod
     def bootstrap():
@@ -197,7 +197,7 @@ class VideoSave(Component):
             frames, final_fps, capture_msg = self.capture_stream_frames()
 
             if frames is None:
-                message = f"❌ {capture_msg}"
+                message = f" {capture_msg}"
             else:
                 video_path, create_msg = self.create_video_from_frames(frames, final_fps)
 
@@ -205,12 +205,12 @@ class VideoSave(Component):
                     save_success, save_msg = self.save_video_locally(video_path)
 
                     if save_success:
-                        message = f"✅ {capture_msg} | {create_msg} | {save_msg}"
+                        message = f" {capture_msg} | {create_msg} | {save_msg}"
                         success = True
                     else:
                         message = f" Video oluşturuldu ancak kaydetme başarısız: {save_msg}"
                 else:
-                    message = f"❌ {create_msg}"
+                    message = f" {create_msg}"
 
         except Exception as e:
             message = f" İşlem sırasında hata oluştu: {str(e)}"
