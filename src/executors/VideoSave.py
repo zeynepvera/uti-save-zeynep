@@ -12,7 +12,7 @@ from collections import deque
 import threading
 import time
 
-sys.path.append(os.path.join(os.path.dirname(__file__), '../'))
+sys.path.append(os.path.join(os.path.dirname(__file__), '../../../../'))
 
 from components.SaveZeynep.src.models.PackageModel import (
     PackageConfigs, ConfigExecutor, VideoSaveResponse,
@@ -33,7 +33,7 @@ class VideoSave(Component):
         self.buffer_size = self.request.get_param("bufferSize")
         self.record_duration = self.request.get_param("recordDuration")
         self.title = self.request.get_param("imageTitle")
-        self.fps = self.request.get_param("configFps")  # Model ile uyumlu
+        self.fps = self.request.get_param("configFps")
         self.storage_type = self.request.get_param("storageType")
 
         if self.storage_type and self.storage_type.get("value") == "cloud":
