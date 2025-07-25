@@ -43,6 +43,8 @@ class VideoSave(Component):
         self.temp_dir = "components/SaveZeynep/VideoTemp"
         self.local_storage_dir = "components/SaveZeynep/SavedVideos"
 
+        self.target_directory = self.request.get_param("targetDirectory")  # "local" or "storage"
+
     @staticmethod
     def bootstrap():
         model = {"models": " "}
@@ -168,28 +170,50 @@ class VideoSave(Component):
         except Exception as e:
             return None, f"Video oluşturma hatası: {str(e)}"
 
+    def save_video(self, video_path):
+        """Save video either locally or to storage."""
+        if self.target_directory == "local":
+            return self.save_video_locally(video_path)
+        else:
+            return self.save_video_to_storage(video_path)
+
     def save_video_locally(self, video_path):
-        """Videoyu local storage'a kaydet"""
+        """Save video to local directory"""
         try:
             success, msg = self._ensure_local_storage_dir()
             if not success:
                 return False, msg
 
-
             video_filename = os.path.basename(video_path)
             local_path = os.path.join(self.local_storage_dir, video_filename)
 
-            print(f"Video kaydedilecek tam yol: {os.path.abspath(local_path)}")
+            print(f"Video will be saved to: {os.path.abspath(local_path)}")
 
             shutil.copy2(video_path, local_path)
 
             if os.path.exists(local_path):
-                return True, f"Video local storage'a kaydedildi: {local_path}"
+                return True, f"Video saved locally: {local_path}"
             else:
-                return False, "Video kopyalanamadı"
+                return False, "Failed to copy the video"
 
         except Exception as e:
-            return False, f"Local kaydetme hatası: {str(e)}"
+            return False, f"Error saving video locally: {str(e)}"
+
+    def save_video_to_storage(self, video_path):
+        """Upload video to storage service"""
+        try:
+            api_endpoint = "your_storage_api_endpoint"  # Set your API endpoint here
+            with open(video_path, "rb") as f:
+                files = {"file": f}
+                response = requests.post(api_endpoint, files=files, data={"title": self.title})
+
+            if response.status_code == 200:
+                return True, "Video uploaded successfully to storage."
+            else:
+                return False, f"Error uploading video: {response.text}"
+
+        except Exception as e:
+            return False, f"Error uploading video to storage: {str(e)}"
 
     def run(self):
         message = ""
@@ -204,7 +228,7 @@ class VideoSave(Component):
                 video_path, create_msg = self.create_video_from_frames(frames, final_fps)
 
                 if video_path:
-                    save_success, save_msg = self.save_video_locally(video_path)
+                    save_success, save_msg = self.save_video(video_path)
 
                     if save_success:
                         message = f" {capture_msg} | {create_msg} | {save_msg}"
