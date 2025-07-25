@@ -19,8 +19,10 @@ class StreamUrl(Config):
     @field_validator('value')
     @classmethod
     def validate_stream_url(cls, v):
-        if not v.startswith(('http://', 'https://', 'rtmp://')):
-            raise ValueError('Stream URL geçerli bir protokol ile başlamalı (http, https, rtmp)')
+        if not v or not isinstance(v, str):
+            raise ValueError('Stream URL boş olamaz')
+        if not v.startswith(('http://', 'https://', 'rtmp://', 'rtsp://')):
+            raise ValueError('Stream URL geçerli bir protokol ile başlamalı (http, https, rtmp, rtsp)')
         return v
 
 
