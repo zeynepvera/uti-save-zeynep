@@ -24,7 +24,6 @@ from sdks.novavision.src.base.component import Component
 
 class VideoSave(Component):
     def __init__(self, request, bootstrap):
-        self.error_list = []
         super().__init__(request)
         self.request.model = PackageModel(**(self.request.data))
 
@@ -32,6 +31,7 @@ class VideoSave(Component):
         self.record_duration = self.request.get_param("recordDuration")
         self.title = self.request.get_param("imageTitle")
         self.user_fps = self.request.get_param("configFps")
+        self.target_directory = self.request.get_param("targetDirectory")
 
         if not self.stream_url:
             raise ValueError("streamUrl parametresi zorunludur.")
@@ -39,11 +39,11 @@ class VideoSave(Component):
         self.user_fps = self.user_fps or 25
         self.record_duration = self.record_duration or 10
         self.title = self.title or "untitled_video"
+        self.target_directory = self.target_directory or "local"
 
         self.temp_dir = "components/SaveZeynep/VideoTemp"
         self.local_storage_dir = "components/SaveZeynep/SavedVideos"
 
-        self.target_directory = self.request.get_param("targetDirectory")  # "local" or "storage"
 
     @staticmethod
     def bootstrap():
@@ -170,51 +170,82 @@ class VideoSave(Component):
         except Exception as e:
             return None, f"Video oluşturma hatası: {str(e)}"
 
+    def save_video_to_storage(self, video_path):
+        """Upload video to storage service - FileSave mantığına uygun şekilde"""
+        try:
+            if not hasattr(self, 'environment'):
+                return False, "Environment configuration not available for storage upload"
+
+            api_endpoint = f"{self.environment.web_api}/storage/default/upload?access-token={self.environment.device_access_token}"
+
+            timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+            final_filename = f"{self.title}_{timestamp}.mp4"
+
+            with open(video_path, "rb") as f:
+                files = {"file": f}
+                data = {"title": final_filename}
+
+                # Timeout ve error handling ekle
+                response = requests.post(
+                    api_endpoint,
+                    files=files,
+                    data=data,
+                    timeout=60  # Video dosyaları büyük olabilir
+                )
+
+            if response.status_code == 200:
+                try:
+                    response_data = response.json()
+                    file_url = response_data.get('url', 'Upload successful')
+                    return True, f"Video uploaded successfully to storage: {file_url}"
+                except:
+                    return True, f"Video uploaded successfully: {response.text}"
+            else:
+                return False, f"Storage upload failed: {response.status_code} - {response.text}"
+
+        except requests.exceptions.Timeout:
+            return False, "Storage upload timed out (file too large or network issue)"
+        except requests.exceptions.ConnectionError:
+            return False, "Could not connect to storage service"
+        except Exception as e:
+            return False, f"Error uploading video to storage: {str(e)}"
+
     def save_video(self, video_path):
-        """Save video either locally or to storage."""
+        """Save video either locally or to storage - İyileştirilmiş versiyon"""
         if self.target_directory == "local":
             return self.save_video_locally(video_path)
-        else:
+        elif self.target_directory == "storage":
             return self.save_video_to_storage(video_path)
+        else:
+            return False, f"Invalid target directory: {self.target_directory}. Must be 'local' or 'storage'"
 
     def save_video_locally(self, video_path):
-        """Save video to local directory"""
+        """Save video to local directory - Hata kontrolü iyileştirildi"""
         try:
             success, msg = self._ensure_local_storage_dir()
             if not success:
                 return False, msg
 
-            video_filename = os.path.basename(video_path)
+            timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+            video_filename = f"{self.title}_{timestamp}.mp4"
             local_path = os.path.join(self.local_storage_dir, video_filename)
 
             print(f"Video will be saved to: {os.path.abspath(local_path)}")
 
             shutil.copy2(video_path, local_path)
 
-            if os.path.exists(local_path):
-                return True, f"Video saved locally: {local_path}"
+            if os.path.exists(local_path) and os.path.getsize(local_path) > 0:
+                file_size = os.path.getsize(local_path)
+                return True, f"Video saved locally: {local_path} (Size: {file_size} bytes)"
             else:
-                return False, "Failed to copy the video"
+                return False, "Failed to copy the video or file is empty"
 
+        except PermissionError:
+            return False, f"Permission denied: Cannot write to {self.local_storage_dir}"
+        except OSError as e:
+            return False, f"OS error while saving video: {str(e)}"
         except Exception as e:
             return False, f"Error saving video locally: {str(e)}"
-
-    def save_video_to_storage(self, video_path):
-        """Upload video to storage service"""
-        try:
-            api_endpoint = "your_storage_api_endpoint"  # Set your API endpoint here
-            with open(video_path, "rb") as f:
-                files = {"file": f}
-                response = requests.post(api_endpoint, files=files, data={"title": self.title})
-
-            if response.status_code == 200:
-                return True, "Video uploaded successfully to storage."
-            else:
-                return False, f"Error uploading video: {response.text}"
-
-        except Exception as e:
-            return False, f"Error uploading video to storage: {str(e)}"
-
     def run(self):
         message = ""
         success = False
@@ -223,7 +254,7 @@ class VideoSave(Component):
             frames, final_fps, capture_msg = self.capture_stream_frames()
 
             if frames is None:
-                message = f" {capture_msg}"
+                message = f"Capture failed: {capture_msg}"
             else:
                 video_path, create_msg = self.create_video_from_frames(frames, final_fps)
 
@@ -231,15 +262,15 @@ class VideoSave(Component):
                     save_success, save_msg = self.save_video(video_path)
 
                     if save_success:
-                        message = f" {capture_msg} | {create_msg} | {save_msg}"
+                        message = f"Success: {capture_msg} | {create_msg} | {save_msg}"
                         success = True
                     else:
-                        message = f" Video oluşturuldu ancak kaydetme başarısız: {save_msg}"
+                        message = f"Video created but save failed: {save_msg}"
                 else:
-                    message = f" {create_msg}"
+                    message = f"Video creation failed: {create_msg}"
 
         except Exception as e:
-            message = f" İşlem sırasında hata oluştu: {str(e)}"
+            message = f"Process error: {str(e)}"
         finally:
             self._cleanup_temp_dir()
 
@@ -248,9 +279,7 @@ class VideoSave(Component):
             videoSaveOutputs = VideoSaveOutputs(outputVideoUrl=outputVideoUrl)
             videoSaveResponse = VideoSaveResponse(outputs=videoSaveOutputs)
 
-            from components.SaveZeynep.src.models.PackageModel import VideoSave as VideoSaveModel
-            videoSave = VideoSaveModel(value=videoSaveResponse)
-
+            videoSave = VideoSave(value=videoSaveResponse)
             executor = ConfigExecutor(value=videoSave)
             packageConfigs = PackageConfigs(executor=executor)
             packageModel = PackageModel(configs=packageConfigs)
@@ -258,5 +287,4 @@ class VideoSave(Component):
             return Response(model=packageModel).response()
 
         except Exception as e:
-            # Fallback response
-            return Response(model={"error": f"Response oluşturma hatası: {str(e)}"}).response()
+            return Response(model={"error": f"Response creation error: {str(e)}", "success": False}).response()

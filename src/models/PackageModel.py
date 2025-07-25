@@ -1,6 +1,5 @@
-from pydantic import Field, ConfigDict, validator
+from pydantic import Field, ConfigDict, field_validator
 from typing import List, Optional, Union, Literal
-
 from sdks.novavision.src.base.model import Package, Image, Param, Inputs, Configs, Outputs, Response, Request, Output, \
     Input, Config
 
@@ -17,7 +16,8 @@ class StreamUrl(Config):
     type: Literal["string"] = "string"
     field: Literal["textInput"] = "textInput"
 
-    @validator('value')
+    @field_validator('value')
+    @classmethod
     def validate_stream_url(cls, v):
         if not v.startswith(('http://', 'https://', 'rtmp://')):
             raise ValueError('Stream URL geçerli bir protokol ile başlamalı (http, https, rtmp)')
@@ -40,9 +40,16 @@ class ImageTitle(Config):
 
 class ConfigFps(Config):
     name: Literal["configFps"] = "configFps"
-    value: int = Field(default=25, ge=1, le=60)  # Min 1 FPS, Max 60 FPS
+    value: int = Field(default=25, ge=1, le=60)
     type: Literal["number"] = "number"
     field: Literal["textInput"] = "textInput"
+
+
+class TargetDirectory(Config):
+    name: Literal["targetDirectory"] = "targetDirectory"
+    value: Literal["local", "storage"] = "local"
+    type: Literal["string"] = "string"
+    field: Literal["dropdown"] = "dropdown"
 
 
 class VideoSaveConfigs(Configs):
@@ -50,11 +57,11 @@ class VideoSaveConfigs(Configs):
     recordDuration: RecordDuration
     imageTitle: ImageTitle
     configFps: ConfigFps
+    targetDirectory: TargetDirectory
 
 
 class VideoSaveRequest(Request):
     configs: VideoSaveConfigs
-
     model_config = ConfigDict(
         json_schema_extra={
             "target": "configs"
@@ -75,7 +82,6 @@ class VideoSave(Config):
     value: Union[VideoSaveRequest, VideoSaveResponse]
     type: Literal["object"] = "object"
     field: Literal["option"] = "option"
-
     model_config = ConfigDict(
         title="Video Save",
         json_schema_extra={
@@ -91,7 +97,6 @@ class ConfigExecutor(Config):
     value: VideoSave
     type: Literal["executor"] = "executor"
     field: Literal["dependentDropdownlist"] = "dependentDropdownlist"
-
     model_config = ConfigDict(
         title="Task",
         json_schema_extra={
