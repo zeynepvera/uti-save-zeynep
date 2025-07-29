@@ -67,11 +67,11 @@ class VideoSave(Component):
 
     def get_stream_fps_and_determine_final_fps(self, cap):
         try:
-            system_fps = cap.get(cv2.CAP_PROP_FPS)
+            system_fps = cap.get(cv2.CAP_PROP_FPS) #SISTEMIN FPSI BURADAN ALIYOM
             if system_fps <= 0:
                 final_fps = self.user_fps
                 return final_fps, f"Stream'in FPS değeri tespit edilemedi, kullanıcı FPS ({self.user_fps}) kullanılacak."
-            final_fps = min(self.user_fps, system_fps)
+            final_fps = min(self.user_fps, system_fps) #karsılastırma yapıyoruz
             return final_fps, f"Sistem FPS: {system_fps}, Kullanıcı FPS: {self.user_fps}, Final FPS: {final_fps}"
         except Exception as e:
             return self.user_fps, f"FPS belirleme hatası, kullanıcı FPS kullanılacak: {str(e)}"
@@ -94,7 +94,7 @@ class VideoSave(Component):
                     break
                 current_time = time.time()
                 if current_time - last_frame_time >= frame_interval:
-                    frames.append(frame.copy())
+                    frames.append(frame.copy()) #FRAMEI ALDIK BURADA
                     last_frame_time = current_time
                 if current_time - start_time >= self.record_duration:
                     break
@@ -117,7 +117,7 @@ class VideoSave(Component):
         try:
             height, width, _ = frames[0].shape
             timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-            output_path = os.path.join(self.temp_dir, f"{self.title}_{timestamp}.mp4")
+            output_path = os.path.join(self.temp_dir, f"{self.title}_{timestamp}.mp4") #FRAMELERDEN MP4 OLUSTURDUK
             fourcc = cv2.VideoWriter_fourcc(*'mp4v')
             video_writer = cv2.VideoWriter(output_path, fourcc, fps, (width, height))
             if not video_writer.isOpened():
@@ -141,7 +141,7 @@ class VideoSave(Component):
             timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
             video_filename = f"{self.title}_{timestamp}.mp4"
             local_path = os.path.join(self.local_storage_dir, video_filename)
-            shutil.copy2(video_path, local_path)
+            shutil.copy2(video_path, local_path) #VIDOYU BURAYA KOPYALADIK
             if os.path.exists(local_path) and os.path.getsize(local_path) > 0:
                 return True, f"Video saved locally: {local_path}"
             else:
