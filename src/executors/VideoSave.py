@@ -36,9 +36,9 @@ class VideoSave(Component):
         if not self.stream_url:
             raise ValueError("streamUrl parametresi zorunludur.")
 
-        base_dir = os.path.dirname(os.path.abspath(__file__))
-        self.temp_dir = os.path.join(base_dir, "../../VideoTemp")
-        self.local_storage_dir = os.path.join(base_dir, "../../SavedVideos")
+        base_dir = "/storage"
+        self.temp_dir = os.path.join(base_dir, "temp")
+        self.local_storage_dir = os.path.join(base_dir, "zeynep-videos")
 
         logging.basicConfig(level=logging.INFO)
         self.logger = logging.getLogger(__name__)
