@@ -38,7 +38,7 @@ class VideoSave(Component):
 
         base_dir = "/storage"
         self.temp_dir = os.path.join(base_dir, "temp")
-        self.local_storage_dir = os.path.join(base_dir, "zeynep-videos")
+        self.local_storage_dir = "/storage/zeynep-videos"
 
         logging.basicConfig(level=logging.INFO)
         self.logger = logging.getLogger(__name__)
@@ -105,6 +105,17 @@ class VideoSave(Component):
         finally:
             if cap:
                 cap.release()
+
+    def get_stream_fps_and_determine_final_fps(self, cap):
+        try:
+            system_fps = cap.get(cv2.CAP_PROP_FPS)
+            if system_fps <= 0 or system_fps > 120:
+                return self.user_fps, f"FPS tespit edilemedi veya geçersiz. Kullanıcı FPS ({self.user_fps}) kullanılacak."
+            final_fps = min(self.user_fps, system_fps)
+            return final_fps, f"Sistem FPS: {system_fps}, Kullanıcı FPS: {self.user_fps}, Final FPS: {final_fps}"
+        except Exception as e:
+            return self.user_fps, f"FPS belirlenemedi, kullanıcı FPS kullanılacak: {str(e)}"
+
 
     def create_video_from_frames(self, frames, fps):
         self.logger.info(f"🎞️ [VIDEO] create_video_from_frames başlatıldı. Frame sayısı: {len(frames)}")
