@@ -38,7 +38,7 @@ class VideoSave(Component):
         self.logger = logging.getLogger(__name__)
 
     @staticmethod
-    def bootstrap():
+    def bootstrap(config : dict) -> dict:
         return {"models": " "}
 
     def capture_stream_frames(self):
