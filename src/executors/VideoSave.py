@@ -9,15 +9,17 @@ import logging
 
 sys.path.append(os.path.join(os.path.dirname(__file__), '../../../../'))
 
-
-from sdks.novavision.src.base.response import Response
 from sdks.novavision.src.base.component import Component
 from sdks.novavision.src.helper.executor import Executor
 from components.SaveZeynep.src.utils.response import build_response
 from components.SaveZeynep.src.models.PackageModel import PackageModel
+from sdks.novavision.src.base.application import Application
 
+logging.basicConfig(level=logging.INFO)
 
 class VideoSave(Component):
+    application = Application()
+
     def __init__(self, request, bootstrap):
         super().__init__(request, bootstrap)
         self.request.model = PackageModel(**(self.request.data))
@@ -33,29 +35,28 @@ class VideoSave(Component):
         base_dir = "/storage"
         self.temp_dir = os.path.join(base_dir, "temp")
         self.local_storage_dir = "/storage/zeynep-videos"
-
-        logging.basicConfig(level=logging.INFO)
         self.logger = logging.getLogger(__name__)
 
     @staticmethod
-    def bootstrap(config : dict) -> dict:
-        return {"models": " "}
+    def bootstrap(config: dict):
+        video_name = VideoSave.application.get_param(config=config, name="videoTitle")
+        return {"video_name": video_name, "outputVideoUrl": None}
 
     def capture_stream_frames(self):
-        self.logger.info("📸 [CAPTURE] Stream yakalama başlıyor...")
+        self.logger.info("Stream capture started")
         cap = None
         try:
             cap = cv2.VideoCapture(self.stream_url)
             cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
 
             if not cap.isOpened():
-                self.logger.error("❌ [CAPTURE] cap.isOpened = False → Stream'e bağlanılamadı!")
-                return None, None, "Stream'e bağlanılamadı."
-            else:
-                self.logger.info("✅ [CAPTURE] Stream bağlantısı başarılı")
+                self.logger.error("Failed to connect to stream")
+                return None, None, None, "Stream connection failed"
+
+            self.logger.info("Stream connection successful")
 
             final_fps, fps_msg = self.get_stream_fps_and_determine_final_fps(cap)
-            self.logger.info(f"[CAPTURE] FPS bilgisi: {fps_msg}")
+            self.logger.info(f"FPS configuration: {fps_msg}")
 
             frame_interval = 1.0 / final_fps
             frames = []
@@ -67,7 +68,7 @@ class VideoSave(Component):
             while True:
                 ret, frame = cap.read()
                 if not ret:
-                    self.logger.warning("⚠️ [CAPTURE] Stream'den frame okunamadı.")
+                    self.logger.warning("Failed to read frame from stream")
                     break
 
                 current_time = time.time()
@@ -78,24 +79,28 @@ class VideoSave(Component):
 
                     if frame_count % 30 == 0:
                         elapsed = current_time - start_time
-                        self.logger.info(f"📦 [CAPTURE] {frame_count} frame alındı ({elapsed:.1f}s)")
+                        self.logger.info(f"Captured {frame_count} frames in {elapsed:.1f}s")
 
                 if current_time - start_time >= self.record_duration:
                     break
 
                 if len(frames) >= max_frames:
-                    self.logger.warning(f"⚠️ [CAPTURE] Max frame limiti aşıldı: {max_frames}")
+                    self.logger.warning(f"Maximum frame limit exceeded: {max_frames}")
                     break
 
-            if not frames:
-                self.logger.error(" [CAPTURE] Hiç frame yakalanamadı.")
-                return None, None, "Hiç frame yakalanamadı."
+            actual_duration = time.time() - start_time
+            actual_fps = len(frames) / actual_duration if actual_duration > 0 else final_fps
+            self.logger.info(f"Capture completed: {len(frames)} frames in {actual_duration:.2f}s")
 
-            self.logger.info(f"✅ [CAPTURE] Toplam frame: {len(frames)}")
-            return frames, final_fps, f"{len(frames)} frame başarıyla yakalandı. ({fps_msg})"
+            if not frames:
+                return None, None, None, "No frames captured"
+
+            return frames, final_fps, actual_fps, f"{len(frames)} frames captured successfully"
+
         except Exception as e:
             self.logger.error(f"Stream capture error: {str(e)}")
-            return None, None, f"Stream yakalama hatası: {str(e)}"
+            return None, None, None, f"Stream capture error: {str(e)}"
+
         finally:
             if cap:
                 cap.release()
@@ -104,17 +109,16 @@ class VideoSave(Component):
         try:
             system_fps = cap.get(cv2.CAP_PROP_FPS)
             if system_fps <= 0 or system_fps > 120:
-                return self.user_fps, f"FPS tespit edilemedi veya geçersiz. Kullanıcı FPS ({self.user_fps}) kullanılacak."
+                return self.user_fps, f"Invalid system FPS detected, using user FPS: {self.user_fps}"
             final_fps = min(self.user_fps, system_fps)
-            return final_fps, f"Sistem FPS: {system_fps}, Kullanıcı FPS: {self.user_fps}, Final FPS: {final_fps}"
+            return final_fps, f"System FPS: {system_fps}, User FPS: {self.user_fps}, Final FPS: {final_fps}"
         except Exception as e:
-            return self.user_fps, f"FPS belirlenemedi, kullanıcı FPS kullanılacak: {str(e)}"
-
+            return self.user_fps, f"FPS detection failed, using user FPS: {str(e)}"
 
     def create_video_from_frames(self, frames, fps):
-        self.logger.info(f"🎞️ [VIDEO] create_video_from_frames başlatıldı. Frame sayısı: {len(frames)}")
+        self.logger.info(f"Video creation started with {len(frames)} frames")
         if not frames:
-            return None, "Frame listesi boş."
+            return None, "Empty frame list"
 
         try:
             os.makedirs(self.temp_dir, exist_ok=True)
@@ -128,19 +132,19 @@ class VideoSave(Component):
             writer = cv2.VideoWriter(output_path, fourcc, fps, (width, height))
 
             if not writer.isOpened():
-                return None, "Video writer açılamadı."
+                return None, "Video writer initialization failed"
 
             for frame in frames:
                 writer.write(frame)
             writer.release()
 
             if not os.path.exists(output_path):
-                return None, "Video dosyası oluşturulamadı."
-            self.logger.info(f"✅ [VIDEO] Video başarıyla oluşturuldu → {output_path}")
-            return output_path, f"Video oluşturuldu: {output_path}"
+                return None, "Video file creation failed"
+            self.logger.info(f"Video created successfully: {output_path}")
+            return output_path, f"Video created: {output_path}"
         except Exception as e:
-            self.logger.error(f"Video oluşturma hatası: {str(e)}")
-            return None, f"Video oluşturma hatası: {str(e)}"
+            self.logger.error(f"Video creation error: {str(e)}")
+            return None, f"Video creation error: {str(e)}"
 
     def save_video_locally(self, video_path):
         try:
@@ -152,64 +156,43 @@ class VideoSave(Component):
             video_filename = f"{self.title}_{timestamp}_{unique_id}{ext}"
             local_path = os.path.join(self.local_storage_dir, video_filename)
 
-            self.logger.info(f"💾 [SAVE] Video kaydediliyor: {video_path} → {local_path}")
+            self.logger.info(f"Saving video: {video_path} to {local_path}")
             shutil.copy2(video_path, local_path)
 
             if not os.path.exists(local_path):
-                return False, "Kopyalama başarısız."
-            self.logger.info(f"✅ [SAVE] Kopyalama başarılı: {local_path}")
+                return False, "Copy operation failed"
+            self.logger.info(f"Video saved successfully: {local_path}")
             return True, f"Video saved locally: {local_path}"
         except Exception as e:
-            self.logger.error(f"Video kayıt hatası: {str(e)}")
-            return False, f"Hata: {str(e)}"
+            self.logger.error(f"Video save error: {str(e)}")
+            return False, f"Error: {str(e)}"
 
-    def save_video(self, video_path):
-        return self.save_video_locally(video_path)
+    def process_and_save_video(self):
+        self.logger.info("VideoSave process started")
+        self.logger.info(f"Stream URL: {self.stream_url}")
+        self.logger.info(f"Duration: {self.record_duration}s | FPS: {self.user_fps} | Title: {self.title}")
 
-    def run(self):
-        self.logger.info("🚀 [RUN] VideoSave.run() başladı")
-        self.logger.info(f"🔗 [RUN] Stream URL: {self.stream_url}")
-        self.logger.info(f"⏱️ [RUN] Süre: {self.record_duration}s | FPS: {self.user_fps} | Başlık: {self.title}")
-
-        message = ""
         saved_path = None
 
-        # 1) Video yakalama + oluşturma + kaydetme
         try:
-            frames, final_fps, capture_msg = self.capture_stream_frames()
-            if frames is None:
-                message = f"Capture failed: {capture_msg}"
-                self.logger.error(message)
-            else:
-                self.logger.info(f"🎬 [RUN] Frame sayısı: {len(frames)}, FPS: {final_fps}")
-                video_path, create_msg = self.create_video_from_frames(frames, final_fps)
+            frames, final_fps, actual_fps, capture_msg = self.capture_stream_frames()
+            if frames is not None:
+                self.logger.info(f"Processing {len(frames)} frames with FPS: {actual_fps:.2f}")
+                video_path, create_msg = self.create_video_from_frames(frames, actual_fps)
                 if video_path:
-                    save_success, save_msg = self.save_video(video_path)
-                    if save_success:
-                        saved_path = save_msg.split("Video saved locally: ")[1] \
-                            if "Video saved locally:" in save_msg else None
-                        message = f"✅ Success: {capture_msg} | {create_msg} | {save_msg}"
-                        self.logger.info("✅ [RUN] VideoSave işlemi başarıyla tamamlandı.")
-                    else:
-                        message = f"Video created but save failed: {save_msg}"
-                        self.logger.error(message)
-                else:
-                    message = f"Video creation failed: {create_msg}"
-                    self.logger.error(message)
+                    save_success, save_msg = self.save_video_locally(video_path)
+                    if save_success and "Video saved locally: " in save_msg:
+                        saved_path = save_msg.split("Video saved locally: ")[1]
+                        self.logger.info("VideoSave process completed successfully")
         except Exception as e:
-            message = f"Process error: {e}"
-            self.logger.error(message)
+            self.logger.error(f"Process error: {e}")
 
-        ctx = self.bootstrap
-        ctx["outputVideoUrl"] = saved_path or message
+        self.saved_path = saved_path
 
-        package_model = build_response(context=ctx)
+    def run(self):
+        self.process_and_save_video()
+        package_model = build_response(context=self)
+        return package_model
 
-        return Response(
-            context=ctx,
-            model=package_model
-        ).response()
-
-
-if "__main__" == __name__:
+if __name__ == "__main__":
     Executor(sys.argv[1]).run()
