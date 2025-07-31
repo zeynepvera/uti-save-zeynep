@@ -1,36 +1,30 @@
 import cv2
-import json
-import numpy as np
 import sys
 import os
-import base64
 import uuid
-import requests
 import shutil
 import datetime
-import threading
 import time
 import logging
 
 sys.path.append(os.path.join(os.path.dirname(__file__), '../../../../'))
 
-from components.SaveZeynep.src.models.PackageModel import (
-    PackageConfigs, ConfigExecutor, VideoSaveResponse,
-    VideoSaveOutputs, OutputVideoUrl, PackageModel
-)
 
 from sdks.novavision.src.base.response import Response
 from sdks.novavision.src.base.component import Component
+from sdks.novavision.src.helper.executor import Executor
+from components.SaveZeynep.src.utils.response import build_response
+from components.SaveZeynep.src.models.PackageModel import PackageModel
 
 
 class VideoSave(Component):
     def __init__(self, request, bootstrap):
-        super().__init__(request)
+        super().__init__(request, bootstrap)
         self.request.model = PackageModel(**(self.request.data))
 
         self.stream_url = self.request.get_param("streamUrl")
         self.record_duration = self.request.get_param("recordDuration") or 10
-        self.title = self.request.get_param("imageTitle") or "untitled_video"
+        self.title = self.request.get_param("videoTitle") or "untitled_video"
         self.user_fps = self.request.get_param("configFps") or 25
 
         if not self.stream_url:
@@ -180,6 +174,7 @@ class VideoSave(Component):
         message = ""
         saved_path = None
 
+        # 1) Video yakalama + oluşturma + kaydetme
         try:
             frames, final_fps, capture_msg = self.capture_stream_frames()
             if frames is None:
@@ -191,33 +186,30 @@ class VideoSave(Component):
                 if video_path:
                     save_success, save_msg = self.save_video(video_path)
                     if save_success:
+                        saved_path = save_msg.split("Video saved locally: ")[1] \
+                            if "Video saved locally:" in save_msg else None
                         message = f"✅ Success: {capture_msg} | {create_msg} | {save_msg}"
-                        if "Video saved locally:" in save_msg:
-                            saved_path = save_msg.split("Video saved locally: ")[1].split(" (")[0]
                         self.logger.info("✅ [RUN] VideoSave işlemi başarıyla tamamlandı.")
                     else:
                         message = f"Video created but save failed: {save_msg}"
-                        self.logger.error(f"Save failed: {save_msg}")
+                        self.logger.error(message)
                 else:
                     message = f"Video creation failed: {create_msg}"
-                    self.logger.error(f"Creation failed: {create_msg}")
+                    self.logger.error(message)
         except Exception as e:
-            message = f"Process error: {str(e)}"
-            self.logger.error(f"Process error: {str(e)}")
+            message = f"Process error: {e}"
+            self.logger.error(message)
 
-        try:
-            output_value = saved_path if saved_path else message
-            return Response(model=PackageModel(
-                configs=PackageConfigs(
-                    executor=ConfigExecutor(
-                        value=VideoSaveResponse(
-                            outputs=VideoSaveOutputs(
-                                outputVideoUrl=OutputVideoUrl(value=output_value)
-                            )
-                        )
-                    )
-                )
-            )).response()
-        except Exception as e:
-            self.logger.error(f"Response creation error: {str(e)}")
-            return Response(model={"error": f"Response creation error: {str(e)}", "success": False}).response()
+        ctx = self.bootstrap
+        ctx["outputVideoUrl"] = saved_path or message
+
+        package_model = build_response(context=ctx)
+
+        return Response(
+            context=ctx,
+            model=package_model
+        ).response()
+
+
+if "__main__" == __name__:
+    Executor(sys.argv[1]).run()

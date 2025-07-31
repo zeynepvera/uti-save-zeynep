@@ -1,12 +1,18 @@
-from pydantic import Field, ConfigDict, field_validator
+from pydantic import Field, ConfigDict, field_validator, BaseModel
 from typing import Union, Literal
 from sdks.novavision.src.base.model import Package, Configs, Response, Request, Output, Config
 
+
+class Output(BaseModel):
+    name: str
+    value: str
+    type: str
 
 class OutputVideoUrl(Output):
     name: Literal["outputVideoUrl"] = "outputVideoUrl"
     value: str
     type: Literal["string"] = "string"
+
 
 
 class StreamUrl(Config):
@@ -32,8 +38,8 @@ class RecordDuration(Config):
     field: Literal["textInput"] = "textInput"
 
 
-class ImageTitle(Config):
-    name: Literal["imageTitle"] = "imageTitle"
+class VideoTitle(Config):
+    name: Literal["videoTitle"] = "videoTitle"
     value: str = Field(default="untitled_video", min_length=1, max_length=100)
     type: Literal["string"] = "string"
     field: Literal["textInput"] = "textInput"
@@ -49,7 +55,7 @@ class ConfigFps(Config):
 class VideoSaveConfigs(Configs):
     streamUrl: StreamUrl
     recordDuration: RecordDuration
-    imageTitle: ImageTitle
+    videoTitle: VideoTitle
     configFps: ConfigFps
 
 
@@ -62,11 +68,11 @@ class VideoSaveRequest(Request):
     )
 
 
-class VideoSaveOutputs(Output):
+class VideoSaveOutputs(BaseModel):
     outputVideoUrl: OutputVideoUrl
 
 
-class VideoSaveResponse(Response):
+class VideoSaveResponse(BaseModel):
     outputs: VideoSaveOutputs
 
 
