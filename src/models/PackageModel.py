@@ -52,7 +52,7 @@ class ConfigFps(Config):
 
 class TargetStorage(Config):
     name: Literal["TargetStorage"] = "TargetStorage"
-    value: Literal["storage"] = "storage"
+    value: Literal["TargetStorage"] = "TargetStorage"
     type: Literal["string"] = "string"
     field: Literal["option"] = "option"
 
@@ -62,7 +62,7 @@ class TargetStorage(Config):
 
 class TargetLocal(Config):
     name: Literal["TargetLocal"] = "TargetLocal"
-    value: Literal["local"] = "local"
+    value: Literal["TargetLocal"] = "TargetLocal"
     type: Literal["string"] = "string"
     field: Literal["option"] = "option"
     class Config:
