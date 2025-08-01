@@ -62,7 +62,6 @@ class VideoSave(Component):
             frames = []
             start_time = time.time()
             last_frame_time = 0
-            frame_count = 0
             max_frames = int(self.record_duration * final_fps) + 10
 
             while True:
@@ -75,11 +74,11 @@ class VideoSave(Component):
                 if current_time - last_frame_time >= frame_interval:
                     frames.append(frame.copy())
                     last_frame_time = current_time
-                    frame_count += 1
 
-                    if frame_count % 30 == 0:
+                    # Progress logging using actual frame count
+                    if len(frames) % 30 == 0:
                         elapsed = current_time - start_time
-                        self.logger.info(f"Captured {frame_count} frames in {elapsed:.1f}s")
+                        self.logger.info(f"Captured {len(frames)} frames in {elapsed:.1f}s")
 
                 if current_time - start_time >= self.record_duration:
                     break
@@ -196,4 +195,3 @@ class VideoSave(Component):
 
 if __name__ == "__main__":
     Executor(sys.argv[1]).run()
-
