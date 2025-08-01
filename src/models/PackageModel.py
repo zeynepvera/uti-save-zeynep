@@ -14,7 +14,6 @@ class OutputVideoUrl(Output):
     type: Literal["string"] = "string"
 
 
-
 class StreamUrl(Config):
     name: Literal["streamUrl"] = "streamUrl"
     value: str
@@ -51,12 +50,42 @@ class ConfigFps(Config):
     type: Literal["number"] = "number"
     field: Literal["textInput"] = "textInput"
 
+class TargetStorage(Config):
+    name: Literal["TargetStorage"] = "TargetStorage"
+    value: Literal["storage"] = "storage"
+    type: Literal["string"] = "string"
+    field: Literal["option"] = "option"
+
+    class Config:
+        title = "Storage"
+
+
+class TargetLocal(Config):
+    name: Literal["TargetLocal"] = "TargetLocal"
+    value: Literal["local"] = "local"
+    type: Literal["string"] = "string"
+    field: Literal["option"] = "option"
+    class Config:
+        title = "Local"
+
+
+
+class ConfigTargetDirectory(Config):
+    name: Literal["ConfigTargetDirectory"] = "ConfigTargetDirectory"
+    value: Union[TargetStorage, TargetLocal]
+    type: Literal["object"] = "object"
+    field: Literal["dependentDropdownlist"] = "dependentDropdownlist"
+
+    class Config:
+        title = "Directory Place"
+
 
 class VideoSaveConfigs(Configs):
     streamUrl: StreamUrl
     recordDuration: RecordDuration
     videoTitle: VideoTitle
     configFps: ConfigFps
+    configTargetDirectory: ConfigTargetDirectory
 
 
 class VideoSaveRequest(Request):
