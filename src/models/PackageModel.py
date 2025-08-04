@@ -50,14 +50,14 @@ class ConfigFps(Config):
     type: Literal["number"] = "number"
     field: Literal["textInput"] = "textInput"
 
-class TargetStorage(Config):
-    name: Literal["TargetStorage"] = "TargetStorage"
-    value: Literal["TargetStorage"] = "TargetStorage"
+class TargetCloud(Config):
+    name: Literal["TargetCloud"] = "TargetCloud"
+    value: Literal["TargetCloud"] = "TargetCloud"
     type: Literal["string"] = "string"
     field: Literal["option"] = "option"
 
     class Config:
-        title = "Storage"
+        title = "Cloud"
 
 
 class TargetLocal(Config):
@@ -72,7 +72,7 @@ class TargetLocal(Config):
 
 class ConfigTargetDirectory(Config):
     name: Literal["ConfigTargetDirectory"] = "ConfigTargetDirectory"
-    value: Union[TargetStorage, TargetLocal]
+    value: Union[TargetCloud, TargetLocal]
     type: Literal["object"] = "object"
     field: Literal["dependentDropdownlist"] = "dependentDropdownlist"
 
