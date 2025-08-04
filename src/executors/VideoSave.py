@@ -6,6 +6,7 @@ import shutil
 import datetime
 import time
 import logging
+import requests
 
 sys.path.append(os.path.join(os.path.dirname(__file__), '../../../../'))
 
@@ -28,13 +29,15 @@ class VideoSave(Component):
         self.record_duration = self.request.get_param("recordDuration") or 10
         self.title = self.request.get_param("videoTitle") or "untitled_video"
         self.user_fps = self.request.get_param("configFps") or 25
+        self.targetDirectory = self.request.get_param("ConfigTargetDirectory")
+        self.target_type = self.targetDirectory.get("value", {}).get("value", "TargetLocal")
+        self.local_path = "/storage/zeynep-videos"
 
         if not self.stream_url:
             raise ValueError("streamUrl parametresi zorunludur.")
 
         base_dir = "/storage"
         self.temp_dir = os.path.join(base_dir, "temp")
-        self.local_storage_dir = "/storage/zeynep-videos"
         self.logger = logging.getLogger(__name__)
 
     @staticmethod
@@ -145,31 +148,61 @@ class VideoSave(Component):
             self.logger.error(f"Video creation error: {str(e)}")
             return None, f"Video creation error: {str(e)}"
 
-    def save_video_locally(self, video_path):
-        try:
-            os.makedirs(self.local_storage_dir, exist_ok=True)
 
+
+    def save_video(self, video_path):
+        try:
             timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
             unique_id = str(uuid.uuid4())[:8]
             _, ext = os.path.splitext(video_path)
             video_filename = f"{self.title}_{timestamp}_{unique_id}{ext}"
-            local_path = os.path.join(self.local_storage_dir, video_filename)
 
-            self.logger.info(f"Saving video: {video_path} to {local_path}")
-            shutil.copy2(video_path, local_path)
+            if self.target_type == "TargetLocal":
+                # Local kaydet
+                os.makedirs(self.local_path, exist_ok=True)
+                full_path = os.path.join(self.local_path, video_filename)
+                self.logger.info(f"Saving video locally to: {full_path}")
+                shutil.copy2(video_path, full_path)
 
-            if not os.path.exists(local_path):
-                return False, "Copy operation failed"
-            self.logger.info(f"Video saved successfully: {local_path}")
-            return True, f"Video saved locally: {local_path}"
+                if not os.path.exists(full_path):
+                    raise IOError(f"Failed to save video to {full_path}")
+
+                return True, f"Video saved locally: {full_path}"
+
+            else:
+                # Remote (storage) yükleme
+                if not os.path.exists("/storage/temp"):
+                    os.makedirs("/storage/temp")
+                temp_path = f"/storage/temp/{video_filename}"
+                shutil.copy2(video_path, temp_path)
+
+                self.logger.info(f"Uploading video to storage: {temp_path}")
+
+                api_endpoint = f"{self.environment.web_api}/storage/default/upload?access-token={self.environment.device_access_token}"
+
+                with open(temp_path, "rb") as f:
+                    files = {"file": f}
+                    response = requests.post(api_endpoint, files=files, data={"title": video_filename})
+
+                try:
+                    os.remove(temp_path)
+                except Exception as e:
+                    self.logger.warning(f"Temp file cleanup failed: {e}")
+
+                if response.status_code != 200:
+                    raise Exception(f"Storage upload failed: {response.status_code} - {response.text}")
+
+                return True, f"Video saved locally: {response.text}"
+
         except Exception as e:
-            self.logger.error(f"Video save error: {str(e)}")
-            return False, f"Error: {str(e)}"
+            self.logger.error(f"save_video error: {e}")
+            return False, f"Error: {e}"
 
     def process_and_save_video(self):
         self.logger.info("VideoSave process started")
         self.logger.info(f"Stream URL: {self.stream_url}")
         self.logger.info(f"Duration: {self.record_duration}s | FPS: {self.user_fps} | Title: {self.title}")
+        self.logger.info(f"Target type resolved as: {self.target_type}")
 
         saved_path = None
 
@@ -179,9 +212,11 @@ class VideoSave(Component):
                 self.logger.info(f"Processing {len(frames)} frames with FPS: {actual_fps:.2f}")
                 video_path, create_msg = self.create_video_from_frames(frames, actual_fps)
                 if video_path:
-                    save_success, save_msg = self.save_video_locally(video_path)
+                    save_success, save_msg = self.save_video(video_path)
                     if save_success and "Video saved locally: " in save_msg:
                         saved_path = save_msg.split("Video saved locally: ")[1]
+                    elif "Video uploaded to cloud: " in save_msg:
+                        saved_path = save_msg.split("Video uploaded to cloud: ")[1]
                         self.logger.info("VideoSave process completed successfully")
         except Exception as e:
             self.logger.error(f"Process error: {e}")
