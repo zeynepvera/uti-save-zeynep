@@ -28,9 +28,13 @@ class VideoSave(Component):
         self.stream_url = self.request.get_param("streamUrl")
         self.record_duration = self.request.get_param("recordDuration") or 10
         self.title = self.request.get_param("videoTitle") or "untitled_video"
-        self.user_fps = self.request.get_param("configFps") or 25
+        self.user_fps = self.request.get_param("configFps")
         self.targetDirectory = self.request.get_param("ConfigTargetDirectory")
-        self.target_type = self.targetDirectory.get("value", {}).get("value", "TargetLocal")
+        raw_target = self.request.get_param("ConfigTargetDirectory")
+        if isinstance(raw_target, dict):
+            self.target_type = raw_target.get("value", {}).get("value", "TargetLocal")
+        else:
+            self.target_type = raw_target or "TargetLocal"
         self.local_path = "/storage/zeynep-videos"
 
         if not self.stream_url:
@@ -62,12 +66,12 @@ class VideoSave(Component):
             self.logger.info(f"FPS configuration: {fps_msg}")
 
             frame_interval = 1.0 / final_fps
+            required_frame_count = int(self.record_duration * final_fps)
             frames = []
             start_time = time.time()
             last_frame_time = 0
-            max_frames = int(self.record_duration * final_fps) + 10
 
-            while True:
+            while len(frames) < required_frame_count:
                 ret, frame = cap.read()
                 if not ret:
                     self.logger.warning("Failed to read frame from stream")
@@ -78,26 +82,17 @@ class VideoSave(Component):
                     frames.append(frame.copy())
                     last_frame_time = current_time
 
-                    # Progress logging using actual frame count
                     if len(frames) % 30 == 0:
                         elapsed = current_time - start_time
                         self.logger.info(f"Captured {len(frames)} frames in {elapsed:.1f}s")
 
-                if current_time - start_time >= self.record_duration:
-                    break
-
-                if len(frames) >= max_frames:
-                    self.logger.warning(f"Maximum frame limit exceeded: {max_frames}")
-                    break
-
             actual_duration = time.time() - start_time
-            actual_fps = len(frames) / actual_duration if actual_duration > 0 else final_fps
             self.logger.info(f"Capture completed: {len(frames)} frames in {actual_duration:.2f}s")
 
             if not frames:
                 return None, None, None, "No frames captured"
 
-            return frames, final_fps, actual_fps, f"{len(frames)} frames captured successfully"
+            return frames, final_fps, final_fps, f"{len(frames)} frames captured successfully"
 
         except Exception as e:
             self.logger.error(f"Stream capture error: {str(e)}")
@@ -109,13 +104,29 @@ class VideoSave(Component):
 
     def get_stream_fps_and_determine_final_fps(self, cap):
         try:
-            system_fps = cap.get(cv2.CAP_PROP_FPS)
+            system_fps = self.estimate_stream_fps(cap)
             if system_fps <= 0 or system_fps > 120:
-                return self.user_fps, f"Invalid system FPS detected, using user FPS: {self.user_fps}"
-            final_fps = min(self.user_fps, system_fps)
-            return final_fps, f"System FPS: {system_fps}, User FPS: {self.user_fps}, Final FPS: {final_fps}"
+                final_fps = self.user_fps
+                return final_fps, f"System FPS unknown or invalid (measured: {system_fps}), using user FPS: {self.user_fps}"
+            else:
+                final_fps = min(self.user_fps, system_fps)
+                return final_fps, f"System FPS (measured): {system_fps}, User FPS: {self.user_fps}, Final FPS: {final_fps}"
         except Exception as e:
-            return self.user_fps, f"FPS detection failed, using user FPS: {str(e)}"
+            return self.user_fps, f"FPS estimation failed, using user FPS: {self.user_fps}. Error: {str(e)}"
+
+    def estimate_stream_fps(self, cap, sample_duration=2.0):
+        start = time.time()
+        frame_count = 0
+
+        while (time.time() - start) < sample_duration:
+            ret, frame = cap.read()
+            if not ret:
+                break
+            frame_count += 1
+
+        duration = time.time() - start
+        fps_estimate = frame_count / duration if duration > 0 else 0.0
+        return round(fps_estimate, 2)
 
     def create_video_from_frames(self, frames, fps):
         self.logger.info(f"Video creation started with {len(frames)} frames")
@@ -148,8 +159,6 @@ class VideoSave(Component):
             self.logger.error(f"Video creation error: {str(e)}")
             return None, f"Video creation error: {str(e)}"
 
-
-
     def save_video(self, video_path):
         try:
             timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -158,7 +167,6 @@ class VideoSave(Component):
             video_filename = f"{self.title}_{timestamp}_{unique_id}{ext}"
 
             if self.target_type == "TargetLocal":
-                # Local kaydet
                 os.makedirs(self.local_path, exist_ok=True)
                 full_path = os.path.join(self.local_path, video_filename)
                 self.logger.info(f"Saving video locally to: {full_path}")
@@ -170,7 +178,6 @@ class VideoSave(Component):
                 return True, f"Video saved locally: {full_path}"
 
             else:
-                # Remote (storage) yükleme
                 if not os.path.exists("/storage/temp"):
                     os.makedirs("/storage/temp")
                 temp_path = f"/storage/temp/{video_filename}"
@@ -207,10 +214,10 @@ class VideoSave(Component):
         saved_path = None
 
         try:
-            frames, final_fps, actual_fps, capture_msg = self.capture_stream_frames()
+            frames, final_fps, _, capture_msg = self.capture_stream_frames()
             if frames is not None:
-                self.logger.info(f"Processing {len(frames)} frames with FPS: {actual_fps:.2f}")
-                video_path, create_msg = self.create_video_from_frames(frames, actual_fps)
+                self.logger.info(f"Processing {len(frames)} frames, encoding with FPS: {final_fps}")
+                video_path, create_msg = self.create_video_from_frames(frames, final_fps)
                 if video_path:
                     save_success, save_msg = self.save_video(video_path)
                     if save_success and "Video saved locally: " in save_msg:
