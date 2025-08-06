@@ -25,7 +25,7 @@ class VideoSave(Component):
         self.request.model = PackageModel(**(self.request.data))
 
         self.stream_url = self.request.get_param("streamUrl")
-        self.record_duration = self.request.get_param("recordDuration") or 10
+        self.record_duration = self.request.get_param("recordDuration")
         self.title = self.request.get_param("videoTitle") or "untitled_video"
         self.user_fps = self.request.get_param("configFps")
 

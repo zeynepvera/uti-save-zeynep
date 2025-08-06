@@ -24,9 +24,9 @@ class StreamUrl(Config):
     @classmethod
     def validate_stream_url(cls, v):
         if not v or not isinstance(v, str):
-            raise ValueError('Stream URL boş olamaz')
+            raise ValueError('Stream URL cannot empty')
         if not v.lower().startswith(('http://', 'https://', 'rtmp://', 'rtsp://')):
-            raise ValueError('Stream URL geçerli bir protokol ile başlamalı (http, https, rtmp, rtsp)')
+            raise ValueError('Stream URL must start with valid protocol (http, https, rtmp, rtsp)')
         return v
 
 
