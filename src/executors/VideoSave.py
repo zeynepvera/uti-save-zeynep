@@ -6,7 +6,6 @@ import shutil
 import datetime
 import time
 import logging
-import requests
 
 sys.path.append(os.path.join(os.path.dirname(__file__), '../../../../'))
 
@@ -29,20 +28,26 @@ class VideoSave(Component):
         self.record_duration = self.request.get_param("recordDuration") or 10
         self.title = self.request.get_param("videoTitle") or "untitled_video"
         self.user_fps = self.request.get_param("configFps")
-        self.targetDirectory = self.request.get_param("ConfigTargetDirectory")
+
         raw_target = self.request.get_param("ConfigTargetDirectory")
         if isinstance(raw_target, dict):
             self.target_type = raw_target.get("value", {}).get("value", "TargetLocal")
         else:
             self.target_type = raw_target or "TargetLocal"
+
         self.local_path = "/storage/zeynep-videos"
 
         if not self.stream_url:
-            raise ValueError("streamUrl parametresi zorunludur.")
+            raise ValueError("streamUrl parameter is required.")
 
-        base_dir = "/storage"
-        self.temp_dir = os.path.join(base_dir, "temp")
+        self.temp_dir = "/storage/temp"
         self.logger = logging.getLogger(__name__)
+
+    def _generate_filename(self, extension=".mp4"):
+        """Generate unique filename"""
+        timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+        unique_id = str(uuid.uuid4())[:8]
+        return f"{self.title}_{timestamp}_{unique_id}{extension}"
 
     @staticmethod
     def bootstrap(config: dict):
@@ -50,7 +55,6 @@ class VideoSave(Component):
         return {"video_name": video_name, "outputVideoUrl": None}
 
     def capture_stream_frames(self):
-        self.logger.info("Stream capture started")
         cap = None
         try:
             cap = cv2.VideoCapture(self.stream_url)
@@ -58,9 +62,7 @@ class VideoSave(Component):
 
             if not cap.isOpened():
                 self.logger.error("Failed to connect to stream")
-                return None, None, None, "Stream connection failed"
-
-            self.logger.info("Stream connection successful")
+                return None, None
 
             final_fps, fps_msg = self.get_stream_fps_and_determine_final_fps(cap)
             self.logger.info(f"FPS configuration: {fps_msg}")
@@ -74,7 +76,6 @@ class VideoSave(Component):
             while len(frames) < required_frame_count:
                 ret, frame = cap.read()
                 if not ret:
-                    self.logger.warning("Failed to read frame from stream")
                     break
 
                 current_time = time.time()
@@ -82,21 +83,16 @@ class VideoSave(Component):
                     frames.append(frame.copy())
                     last_frame_time = current_time
 
-                    if len(frames) % 30 == 0:
-                        elapsed = current_time - start_time
-                        self.logger.info(f"Captured {len(frames)} frames in {elapsed:.1f}s")
-
-            actual_duration = time.time() - start_time
-            self.logger.info(f"Capture completed: {len(frames)} frames in {actual_duration:.2f}s")
+            self.logger.info(f"Capture completed: {len(frames)} frames in {time.time() - start_time:.2f}s")
 
             if not frames:
-                return None, None, None, "No frames captured"
+                return None, None
 
-            return frames, final_fps, final_fps, f"{len(frames)} frames captured successfully"
+            return frames, final_fps
 
         except Exception as e:
             self.logger.error(f"Stream capture error: {str(e)}")
-            return None, None, None, f"Stream capture error: {str(e)}"
+            return None, None
 
         finally:
             if cap:
@@ -106,13 +102,12 @@ class VideoSave(Component):
         try:
             system_fps = self.estimate_stream_fps(cap)
             if system_fps <= 0 or system_fps > 120:
-                final_fps = self.user_fps
-                return final_fps, f"System FPS unknown or invalid (measured: {system_fps}), using user FPS: {self.user_fps}"
+                return self.user_fps, f"System FPS invalid, using user FPS: {self.user_fps}"
             else:
                 final_fps = min(self.user_fps, system_fps)
-                return final_fps, f"System FPS (measured): {system_fps}, User FPS: {self.user_fps}, Final FPS: {final_fps}"
+                return final_fps, f"System FPS: {system_fps}, Final FPS: {final_fps}"
         except Exception as e:
-            return self.user_fps, f"FPS estimation failed, using user FPS: {self.user_fps}. Error: {str(e)}"
+            return self.user_fps, f"FPS estimation failed, using user FPS: {self.user_fps}"
 
     def estimate_stream_fps(self, cap, sample_duration=2.0):
         start = time.time()
@@ -125,65 +120,55 @@ class VideoSave(Component):
             frame_count += 1
 
         duration = time.time() - start
-        fps_estimate = frame_count / duration if duration > 0 else 0.0
-        return round(fps_estimate, 2)
+        return round(frame_count / duration, 2) if duration > 0 else 0.0
 
     def create_video_from_frames(self, frames, fps):
-        self.logger.info(f"Video creation started with {len(frames)} frames")
         if not frames:
-            return None, "Empty frame list"
+            return None
 
         try:
             os.makedirs(self.temp_dir, exist_ok=True)
             height, width, _ = frames[0].shape
-            timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-            unique_id = str(uuid.uuid4())[:8]
-            filename = f"{self.title}_{timestamp}_{unique_id}.mp4"
+            filename = self._generate_filename()
             output_path = os.path.join(self.temp_dir, filename)
 
             fourcc = cv2.VideoWriter_fourcc(*'mp4v')
             writer = cv2.VideoWriter(output_path, fourcc, fps, (width, height))
 
             if not writer.isOpened():
-                return None, "Video writer initialization failed"
+                return None
 
             for frame in frames:
                 writer.write(frame)
             writer.release()
 
-            if not os.path.exists(output_path):
-                return None, "Video file creation failed"
-            self.logger.info(f"Video created successfully: {output_path}")
-            return output_path, f"Video created: {output_path}"
+            return output_path if os.path.exists(output_path) else None
+
         except Exception as e:
             self.logger.error(f"Video creation error: {str(e)}")
-            return None, f"Video creation error: {str(e)}"
+            return None
 
     def save_video(self, video_path):
         try:
-            timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-            unique_id = str(uuid.uuid4())[:8]
             _, ext = os.path.splitext(video_path)
-            video_filename = f"{self.title}_{timestamp}_{unique_id}{ext}"
+            video_filename = self._generate_filename(ext)
 
             if self.target_type == "TargetLocal":
                 os.makedirs(self.local_path, exist_ok=True)
                 full_path = os.path.join(self.local_path, video_filename)
-                self.logger.info(f"Saving video locally to: {full_path}")
                 shutil.copy2(video_path, full_path)
 
                 if not os.path.exists(full_path):
                     raise IOError(f"Failed to save video to {full_path}")
 
-                return True, f"Video saved locally: {full_path}"
+                return full_path
 
             else:
-                if not os.path.exists("/storage/temp"):
-                    os.makedirs("/storage/temp")
+                import requests
+
+                os.makedirs("/storage/temp", exist_ok=True)
                 temp_path = f"/storage/temp/{video_filename}"
                 shutil.copy2(video_path, temp_path)
-
-                self.logger.info(f"Uploading video to storage: {temp_path}")
 
                 api_endpoint = f"{self.environment.web_api}/storage/default/upload?access-token={self.environment.device_access_token}"
 
@@ -191,49 +176,32 @@ class VideoSave(Component):
                     files = {"file": f}
                     response = requests.post(api_endpoint, files=files, data={"title": video_filename})
 
-                try:
-                    os.remove(temp_path)
-                except Exception as e:
-                    self.logger.warning(f"Temp file cleanup failed: {e}")
+                os.remove(temp_path)
 
                 if response.status_code != 200:
-                    raise Exception(f"Storage upload failed: {response.status_code} - {response.text}")
+                    raise Exception(f"Storage upload failed: {response.status_code}")
 
-                return True, f"Video saved locally: {response.text}"
+                return response.text
 
         except Exception as e:
             self.logger.error(f"save_video error: {e}")
-            return False, f"Error: {e}"
+            return None
 
     def process_and_save_video(self):
         self.logger.info("VideoSave process started")
-        self.logger.info(f"Stream URL: {self.stream_url}")
-        self.logger.info(f"Duration: {self.record_duration}s | FPS: {self.user_fps} | Title: {self.title}")
-        self.logger.info(f"Target type resolved as: {self.target_type}")
+        self.logger.info(f"Stream: {self.stream_url} | Duration: {self.record_duration}s | FPS: {self.user_fps}")
 
-        saved_path = None
-
-        try:
-            frames, final_fps, _, capture_msg = self.capture_stream_frames()
-            if frames is not None:
-                self.logger.info(f"Processing {len(frames)} frames, encoding with FPS: {final_fps}")
-                video_path, create_msg = self.create_video_from_frames(frames, final_fps)
-                if video_path:
-                    save_success, save_msg = self.save_video(video_path)
-                    if save_success and "Video saved locally: " in save_msg:
-                        saved_path = save_msg.split("Video saved locally: ")[1]
-                    elif "Video uploaded to cloud: " in save_msg:
-                        saved_path = save_msg.split("Video uploaded to cloud: ")[1]
-                        self.logger.info("VideoSave process completed successfully")
-        except Exception as e:
-            self.logger.error(f"Process error: {e}")
-
-        self.saved_path = saved_path
+        frames, final_fps = self.capture_stream_frames()
+        if frames is not None:
+            video_path = self.create_video_from_frames(frames, final_fps)
+            if video_path:
+                self.saved_path = self.save_video(video_path)
+                if self.saved_path:
+                    self.logger.info("VideoSave process completed successfully")
 
     def run(self):
         self.process_and_save_video()
-        package_model = build_response(context=self)
-        return package_model
+        return build_response(context=self)
 
 if __name__ == "__main__":
     Executor(sys.argv[1]).run()
