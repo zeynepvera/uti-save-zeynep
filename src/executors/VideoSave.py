@@ -35,7 +35,9 @@ class VideoSave(Component):
         else:
             self.target_type = raw_target or "TargetLocal"
 
-        self.local_path = "/storage/zeynep-videos"
+
+        self.local_path = "/storage/videos"
+        os.makedirs(self.local_path, exist_ok=True)
 
         if not self.stream_url:
             raise ValueError("streamUrl parameter is required.")
