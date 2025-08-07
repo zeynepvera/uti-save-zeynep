@@ -1,5 +1,5 @@
 from pydantic import Field, ConfigDict, field_validator, BaseModel,validator
-from typing import Union, Literal,Union,List
+from typing import Union, Literal,Union,List, Optional
 from sdks.novavision.src.base.model import Package, Configs,Inputs, Response, Request, Output,Input, Config,Image
 
 class InputImage(Input):
@@ -93,7 +93,7 @@ class VideoSaveConfigs(Configs):
 
 
 class VideoSaveRequest(Request):
-    inputs: VideoSaveInputs
+    inputs: Optional[VideoSaveInputs]
     configs: VideoSaveConfigs
     model_config = ConfigDict(
         json_schema_extra={
