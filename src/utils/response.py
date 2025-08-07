@@ -1,7 +1,7 @@
-# components/SaveZeynep/src/utils/response.py
+# components/VideoSave/src/utils/response.py
 
 from sdks.novavision.src.helper.package import PackageHelper
-from components.SaveZeynep.src.models.PackageModel import (
+from components.VideoSave.src.models.PackageModel import (
     ConfigExecutor, PackageModel, PackageConfigs, OutputVideoUrl,
     VideoSave, VideoSaveOutputs, VideoSaveResponse
 )

@@ -11,8 +11,8 @@ sys.path.append(os.path.join(os.path.dirname(__file__), '../../../../'))
 
 from sdks.novavision.src.base.component import Component
 from sdks.novavision.src.helper.executor import Executor
-from components.SaveZeynep.src.utils.response import build_response
-from components.SaveZeynep.src.models.PackageModel import PackageModel
+from components.VideoSave.src.utils.response import build_response
+from components.VideoSave.src.models.PackageModel import PackageModel
 from sdks.novavision.src.base.application import Application
 
 logging.basicConfig(level=logging.INFO)
