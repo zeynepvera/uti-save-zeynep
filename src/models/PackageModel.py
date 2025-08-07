@@ -1,6 +1,23 @@
-from pydantic import Field, ConfigDict, field_validator, BaseModel
-from typing import Union, Literal
-from sdks.novavision.src.base.model import Package, Configs, Response, Request, Output, Config
+from pydantic import Field, ConfigDict, field_validator, BaseModel,validator
+from typing import Union, Literal,Union,List
+from sdks.novavision.src.base.model import Package, Configs,Inputs, Response, Request, Output,Input, Config,Image
+
+class InputImage(Input):
+    name: Literal["inputImage"] = "inputImage"
+    value: Union[List[Image], Image]
+    type: str = "object"
+
+    @validator("type", pre=True, always=True)
+    def set_type_based_on_value(cls, value, values):
+        value = values.get('value')
+        if isinstance(value, Image):
+            return "object"
+        elif isinstance(value, list):
+            return "list"
+
+    class Config:
+        title = "Input Image"
+
 
 
 class Output(BaseModel):
@@ -14,21 +31,9 @@ class OutputVideoUrl(Output):
     type: Literal["string"] = "string"
 
 
-class StreamUrl(Config):
-    name: Literal["streamUrl"] = "streamUrl"
-    value: str
-    type: Literal["string"] = "string"
-    field: Literal["textInput"] = "textInput"
 
-    @field_validator('value')
-    @classmethod
-    def validate_stream_url(cls, v):
-        if not v or not isinstance(v, str):
-            raise ValueError('Stream URL cannot empty')
-        if not v.lower().startswith(('http://', 'https://', 'rtmp://', 'rtsp://')):
-            raise ValueError('Stream URL must start with valid protocol (http, https, rtmp, rtsp)')
-        return v
-
+class VideoSaveInputs(Inputs):
+    inputImage: InputImage
 
 class RecordDuration(Config):
     name: Literal["recordDuration"] = "recordDuration"
@@ -81,7 +86,6 @@ class ConfigTargetDirectory(Config):
 
 
 class VideoSaveConfigs(Configs):
-    streamUrl: StreamUrl
     recordDuration: RecordDuration
     videoTitle: VideoTitle
     configFps: ConfigFps
@@ -89,6 +93,7 @@ class VideoSaveConfigs(Configs):
 
 
 class VideoSaveRequest(Request):
+    inputs: VideoSaveInputs
     configs: VideoSaveConfigs
     model_config = ConfigDict(
         json_schema_extra={
