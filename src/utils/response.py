@@ -1,10 +1,8 @@
 # components/VideoSave/src/utils/response.py
 
 from sdks.novavision.src.helper.package import PackageHelper
-from components.VideoSave.src.models.PackageModel import (
-    ConfigExecutor, PackageModel, PackageConfigs, OutputVideoUrl,
-    VideoSave, VideoSaveOutputs, VideoSaveResponse
-)
+from components.VideoSave.src.models.PackageModel import ConfigExecutor, PackageModel, PackageConfigs, OutputVideoUrl, VideoSave, VideoSaveOutputs, VideoSaveResponse
+
 
 def build_response(context):
     output_video_url = getattr(context, "saved_path", None)
@@ -14,8 +12,9 @@ def build_response(context):
     videoSaveOutputs = VideoSaveOutputs(outputVideoUrl=outputVideoUrl)
     videoSaveResponse = VideoSaveResponse(outputs=videoSaveOutputs)
     videoSave = VideoSave(value=videoSaveResponse)
-    configexecutor = ConfigExecutor(value=videoSave)
-    packageConfigs = PackageConfigs(executor=configexecutor)
-    helper = PackageHelper(packageModel=PackageModel, packageConfigs=packageConfigs)
-    return helper.build_model(context)
+    executor = ConfigExecutor(value=videoSave)
+    packageConfigs = PackageConfigs(executor=executor)
+    package = PackageHelper(packageModel=PackageModel, packageConfigs=packageConfigs)
+    packageModel = package.build_model(context)
+    return packageModel
 
