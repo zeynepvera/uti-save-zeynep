@@ -86,7 +86,6 @@ class SystemControlTrue(Config):
     class Config:
         title = "Enable"
 
-
 class SystemControlFalse(Config):
 
     name: Literal["SystemControlFalse"] = "SystemControlFalse"
@@ -97,8 +96,6 @@ class SystemControlFalse(Config):
     class Config:
         title = "Disable"
 
-
-
 class SystemControl(Config):
     """
     Controls for enabling or disabling system FPS settings.
@@ -107,7 +104,6 @@ class SystemControl(Config):
     value: Union[SystemControlTrue, SystemControlFalse]
     type: Literal["object"] = "object"
     field: Literal["dependentDropdownlist"] = "dependentDropdownlist"
-    restart: Literal[True] = True
 
     class Config:
         title = "System  FPS Control"
@@ -150,9 +146,9 @@ class ConfigTargetDirectory(Config):
 
 
 class VideoSaveConfigs(Configs):
-    recordDuration: RecordDuration
     videoTitle: VideoTitle
-    configFps: ConfigFps
+    systemControl: SystemControl
+    recordDuration: RecordDuration
     configTargetDirectory: ConfigTargetDirectory
 
 
