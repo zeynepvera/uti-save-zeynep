@@ -1,6 +1,8 @@
-from pydantic import Field, ConfigDict, field_validator, BaseModel,validator
-from typing import Union, Literal,Union,List, Optional
-from sdks.novavision.src.base.model import Package, Configs,Inputs, Response, Request, Output,Input, Config,Image,Outputs
+from pydantic import Field, ConfigDict, field_validator, BaseModel, validator
+from typing import Union, Literal, Union, List, Optional
+from sdks.novavision.src.base.model import Package, Configs, Inputs, Response, Request, Output, Input, Config, Image, \
+    Outputs
+
 
 class InputImage(Input):
     name: Literal["inputImage"] = "inputImage"
@@ -19,11 +21,11 @@ class InputImage(Input):
         title = "Input Image"
 
 
-
 class Output(BaseModel):
     name: str
     value: str
     type: str
+
 
 class OutputVideoUrl(Output):
     name: Literal["outputVideoUrl"] = "outputVideoUrl"
@@ -31,12 +33,11 @@ class OutputVideoUrl(Output):
     type: Literal["string"] = "string"
 
 
-
 class VideoSaveInputs(Inputs):
     inputImage: InputImage
 
-class RecordDuration(Config):
 
+class RecordDuration(Config):
     """    Duration of the video recording in seconds.
     """
 
@@ -50,7 +51,6 @@ class RecordDuration(Config):
 
 
 class VideoTitle(Config):
-
     """    Title of the video to be saved.
     """
 
@@ -62,8 +62,8 @@ class VideoTitle(Config):
     class Config:
         title = "Video Title"
 
-class ConfigFps(Config):
 
+class ConfigFps(Config):
     """    Frames per second (FPS) for recording. If the entered value exceeds the system limit, the system’s maximum FPS will be used.
     """
 
@@ -76,8 +76,18 @@ class ConfigFps(Config):
         title = "Customer FPS"
 
 
-class SystemControlTrue(Config):
+class SystemControlFalse(Config):
     configFps: ConfigFps
+    name: Literal["SystemControlFalse"] = "SystemControlFalse"
+    value: Literal["False"] = "False"
+    type: Literal["string"] = "string"
+    field: Literal["option"] = "option"
+
+    class Config:
+        title = "Disable"
+
+
+class SystemControlTrue(Config):
     name: Literal["SystemControlTrue"] = "SystemControlTrue"
     value: Literal["True"] = "True"
     type: Literal["string"] = "string"
@@ -86,15 +96,6 @@ class SystemControlTrue(Config):
     class Config:
         title = "Enable"
 
-class SystemControlFalse(Config):
-
-    name: Literal["SystemControlFalse"] = "SystemControlFalse"
-    value: Literal["False"] = "False"
-    type: Literal["string"] = "string"
-    field: Literal["option"] = "option"
-
-    class Config:
-        title = "Disable"
 
 class SystemControl(Config):
     """
@@ -107,8 +108,6 @@ class SystemControl(Config):
 
     class Config:
         title = "System  FPS Control"
-
-
 
 
 class TargetCloud(Config):
@@ -126,13 +125,12 @@ class TargetLocal(Config):
     value: Literal["TargetLocal"] = "TargetLocal"
     type: Literal["string"] = "string"
     field: Literal["option"] = "option"
+
     class Config:
         title = "Local"
 
 
-
 class ConfigTargetDirectory(Config):
-
     """Location where the recorded video will be stored.
     """
 
