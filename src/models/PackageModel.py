@@ -101,7 +101,7 @@ class SystemControl(Config):
     """
     Controls for enabling or disabling system FPS settings.
     """
-    name: Literal["SystemControl"] = "SystemControl"
+    name: Literal["systemControl"] = "systemControl"
     value: Union[SystemControlTrue, SystemControlFalse]
     type: Literal["object"] = "object"
     field: Literal["dependentDropdownlist"] = "dependentDropdownlist"
@@ -134,7 +134,7 @@ class ConfigTargetDirectory(Config):
     """Location where the recorded video will be stored.
     """
 
-    name: Literal["ConfigTargetDirectory"] = "ConfigTargetDirectory"
+    name: Literal["configTargetDirectory"] = "configTargetDirectory"
     value: Union[TargetCloud, TargetLocal]
     type: Literal["object"] = "object"
     field: Literal["dependentDropdownlist"] = "dependentDropdownlist"
