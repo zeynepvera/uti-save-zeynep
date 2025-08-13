@@ -21,7 +21,7 @@ class InputImage(Input):
         title = "Input Image"
 
 
-class Output(BaseModel):
+class CustomOutput(BaseModel):
     name: str
     value: str
     type: str
