@@ -20,17 +20,13 @@ class InputImage(Input):
     class Config:
         title = "Input Image"
 
-
-class CustomOutput(BaseModel):
-    name: str
-    value: str
-    type: str
-
-
 class OutputVideoUrl(Output):
     name: Literal["outputVideoUrl"] = "outputVideoUrl"
     value: str
     type: Literal["string"] = "string"
+
+    class Config:
+        title = "VideoUrl"
 
 
 class VideoSaveInputs(Inputs):
@@ -153,11 +149,11 @@ class VideoSaveConfigs(Configs):
 class VideoSaveRequest(Request):
     inputs: Optional[VideoSaveInputs]
     configs: VideoSaveConfigs
-    model_config = ConfigDict(
-        json_schema_extra={
+
+    class Config:
+        json_schema_extra = {
             "target": "configs"
         }
-    )
 
 
 class VideoSaveOutputs(BaseModel):
@@ -173,27 +169,27 @@ class VideoSave(Config):
     value: Union[VideoSaveRequest, VideoSaveResponse]
     type: Literal["object"] = "object"
     field: Literal["option"] = "option"
-    model_config = ConfigDict(
-        title="Video Save",
-        json_schema_extra={
+
+    class Config:
+        title = "VideoSave"
+        json_schema_extra = {
             "target": {
                 "value": 0
             }
         }
-    )
 
 
 class ConfigExecutor(Config):
     name: Literal["ConfigExecutor"] = "ConfigExecutor"
-    value: VideoSave
+    value: Union[VideoSave]
     type: Literal["executor"] = "executor"
     field: Literal["dependentDropdownlist"] = "dependentDropdownlist"
-    model_config = ConfigDict(
-        title="Task",
-        json_schema_extra={
+
+    class Config:
+        title = "Task"
+        json_schema_extra = {
             "target": "value"
         }
-    )
 
 
 class PackageConfigs(Configs):
@@ -204,4 +200,3 @@ class PackageModel(Package):
     configs: PackageConfigs
     type: Literal["component"] = "component"
     name: Literal["VideoSave"] = "VideoSave"
-    uID: str = Field(default="1221112")
