@@ -60,22 +60,24 @@ class VideoSave(Component):
         video_name = VideoSave.application.get_param(config=config, name="videoTitle")
         return {"video_name": video_name, "outputVideoUrl": None}
 
-    def estimate_stream_fps(self, cap, sample_duration=2.0):
+    def estimate_stream_fps(self, img, sample_duration=2.0):
         start = time.time()
         frame_count = 0
 
         while (time.time() - start) < sample_duration:
-            ret, frame = cap.read()
-            if not ret:
-                break
             frame_count += 1
 
         duration = time.time() - start
+
+        print(round(frame_count / duration, 2) if duration > 0 else 0.0)
+
         return round(frame_count / duration, 2) if duration > 0 else 0.0
 
     def get_stream_fps_and_determine_final_fps(self, img):
         try:
-            system_fps = self.estimate_stream_fps(img)
+            #system_fps = self.estimate_stream_fps(img)
+            system_fps = 10
+            print("system_fps:",system_fps)
 
             if self.system_control == "Enable":
                 if system_fps <= 1:
@@ -85,9 +87,9 @@ class VideoSave(Component):
             else:
                 final_fps = min(self.user_fps, system_fps)
 
-            return final_fps, f"System FPS: {system_fps}, Final FPS: {final_fps}", system_fps
+            return final_fps, f"System FPS: {system_fps}, Final FPS: {final_fps}"
         except Exception as e:
-            return self.user_fps, f"FPS estimation failed, using user FPS: {self.user_fps}", system_fps
+            return self.user_fps, f"FPS estimation failed, using user FPS: {self.user_fps}"
 
     def capture_input_frames(self):
         """Frames are captured from inputImage"""
@@ -100,14 +102,16 @@ class VideoSave(Component):
 
         self.logger.info(f"inputImage structure: {self.image}")
 
-        final_fps, fps_msg, self.system_fps = self.get_stream_fps_and_determine_final_fps(self.image)
+        final_fps, fps_msg = self.get_stream_fps_and_determine_final_fps(self.image)
+        print(final_fps)
+        print(fps_msg)
 
         # Image objesinin value alanında direkt numpy array varsa
         if hasattr(self.image, 'value') and isinstance(self.image.value, np.ndarray):
             frame = self.image.value
             if frame is not None:
                 # record_duration * fps kadar aynı frame'i ekle
-                total_frames = int(self.record_duration * self.system_fps)
+                total_frames = int(self.record_duration * 10)
                 frames = [frame.copy() for _ in range(total_frames)]
                 self.logger.info(f"Created {len(frames)} frames from numpy array")
 
@@ -197,7 +201,7 @@ class VideoSave(Component):
         self.logger.info("VideoSave process started")
         frames = self.capture_input_frames()
         if frames:
-            video_path = self.create_video_from_frames(frames, self.system_fps)
+            video_path = self.create_video_from_frames(frames, 10)
             if video_path:
                 self.logger.info("VideoSave process completed successfully")
 
