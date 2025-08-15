@@ -1,4 +1,3 @@
-import cv2
 import sys
 import os
 import uuid
@@ -8,6 +7,7 @@ import time
 import logging
 import base64
 import numpy as np
+import cv2
 
 sys.path.append(os.path.join(os.path.dirname(__file__), '../../../../'))
 
@@ -17,8 +17,6 @@ from components.VideoSave.src.utils.response import build_response
 from components.VideoSave.src.models.PackageModel import PackageModel
 from sdks.novavision.src.base.application import Application
 from sdks.novavision.src.media.image import Image
-
-from components.VideoSave.src.utils.utils import buffer_push_frame
 
 logging.basicConfig(level=logging.INFO)
 
@@ -33,7 +31,7 @@ class VideoSave(Component):
         self.image = self.request.get_param("inputImage")
         self.input_frames = []  # Boş liste olarak initialize et
 
-        #self.input_frames = self._extract_frames_from_input(self.image)
+        # self.input_frames = self._extract_frames_from_input(self.image)
         self.record_duration = self.request.get_param("recordDuration")
         self.title = self.request.get_param("videoTitle") or "untitled_video"
         self.user_fps = self.request.get_param("configFps")
@@ -48,113 +46,106 @@ class VideoSave(Component):
         self.local_path = "/storage/videos"
         os.makedirs(self.local_path, exist_ok=True)
 
-
-
         self.temp_dir = "/storage/temp"
         self.logger = logging.getLogger(__name__)
 
-
-    def generate_filename(self, extension=".mp4"):
+    def _generate_filename(self, extension=".mp4"):
         """Generate unique filename"""
         timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
         unique_id = str(uuid.uuid4())[:8]
-        return f"{self.title}{timestamp}{unique_id}{extension}"
+        return f"{self.title}_{timestamp}_{unique_id}{extension}"
 
     @staticmethod
     def bootstrap(config: dict):
-        buffer = buffer_push_frame(config=config)
         video_name = VideoSave.application.get_param(config=config, name="videoTitle")
-        return {"video_name": video_name, "outputVideoUrl": None},buffer
+        return {"video_name": video_name, "outputVideoUrl": None}
 
-    def get_system_fps_from_input(self, frames, sample_duration=2.0):
-        """Input frame'lerden sistem FPS'ini gerçek zamanlı olarak hesapla"""
-        if not frames:
-            return 25
-
-        start_time = time.time()
+    def estimate_stream_fps(self, cap, sample_duration=2.0):
+        start = time.time()
         frame_count = 0
 
-        while (time.time() - start_time) < sample_duration:
-            if frame_count < len(frames):
-                # Gerçek frame işleme simülasyonu
-                frame = frames[frame_count % len(frames)]
-                # Basit işlem yaparak gerçekçi gecikme oluştur
-                _ = cv2.resize(frame, (100, 100))
-                frame_count += 1
-            else:
+        while (time.time() - start) < sample_duration:
+            ret, frame = cap.read()
+            if not ret:
                 break
+            frame_count += 1
 
-            # Frame işleme süresini simüle et
-            time.sleep(0.01)
+        duration = time.time() - start
+        return round(frame_count / duration, 2) if duration > 0 else 0.0
 
-        duration = time.time() - start_time
-        system_fps = round(frame_count / duration, 2) if duration > 0 else 25
-        system_fps = max(1, min(60, system_fps))
+    def get_stream_fps_and_determine_final_fps(self, img):
+        try:
+            system_fps = self.estimate_stream_fps(img)
 
-        self.logger.info(f"System FPS: {system_fps} ({frame_count} frames in {duration:.2f}s)")
-        return system_fps
+            if self.system_control == "Enable":
+                if system_fps <= 1:
+                    system_fps = 1
 
-    def get_final_fps(self, frames):
-        """Sistem kontrolüne göre final FPS'i belirle"""
-        system_fps = self.get_system_fps_from_input(frames)
-
-        if isinstance(self.system_control, dict):
-            control_value = self.system_control.get("value", {}).get("value", "True")
-        else:
-            control_value = "True"
-
-        if control_value == "True":  # System Control ENABLE
-            self.logger.info(f"System Control enabled - using system FPS: {system_fps}")
-            return system_fps
-        else:  # System Control DISABLE
-            user_fps = self.user_fps
-            final_fps = min(user_fps, system_fps)  # Küçük olanı seç
-
-            if user_fps <= system_fps:
-                self.logger.info(f"User FPS ({user_fps}) <= System FPS ({system_fps}) - using user FPS: {final_fps}")
+                final_fps = system_fps
             else:
-                self.logger.info(f"User FPS ({user_fps}) > System FPS ({system_fps}) - using system FPS: {final_fps}")
+                final_fps = min(self.user_fps, system_fps)
 
-            return final_fps
+            return final_fps, f"System FPS: {system_fps}, Final FPS: {final_fps}", system_fps
+        except Exception as e:
+            return self.user_fps, f"FPS estimation failed, using user FPS: {self.user_fps}", system_fps
 
-    def create_video_from_input_frames(self, frames):
-        """Input frame'lerden video oluştur"""
+    def capture_input_frames(self):
+        """Frames are captured from inputImage"""
+        frames = []
+        start_time = time.time()
+
+        if not self.image:
+            self.logger.error("No input images found")
+            return frames
+
+        self.logger.info(f"inputImage structure: {self.image}")
+
+        final_fps, fps_msg, self.system_fps = self.get_stream_fps_and_determine_final_fps(self.image)
+
+        # Image objesinin value alanında direkt numpy array varsa
+        if hasattr(self.image, 'value') and isinstance(self.image.value, np.ndarray):
+            frame = self.image.value
+            if frame is not None:
+                # record_duration * fps kadar aynı frame'i ekle
+                total_frames = int(self.record_duration * self.system_fps)
+                frames = [frame.copy() for _ in range(total_frames)]
+                self.logger.info(f"Created {len(frames)} frames from numpy array")
+
+        self.logger.info(f"Captured {len(frames)} frames in {time.time() - start_time:.2f}s")
+        return frames
+
+    def create_video_from_frames(self, frames, fps):
+        """Create video from frames"""
         if not frames:
             return None
 
         try:
             os.makedirs(self.temp_dir, exist_ok=True)
-            height, width, _ = frames[0].shape
-            filename = self.generate_filename()
+
+            # Frame'i uint8 formatına dönüştür
+            first_frame = frames[0]
+            if first_frame.dtype != np.uint8:
+                first_frame = np.clip(first_frame, 0, 255).astype(np.uint8)
+
+            height, width, _ = first_frame.shape
+            filename = self._generate_filename()
             output_path = os.path.join(self.temp_dir, filename)
 
-            # FPS'i frame'lere göre belirle
-            final_fps = self.get_final_fps(frames)
-            self.logger.info(f"Creating video with final FPS: {final_fps}")
-
             fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-            writer = cv2.VideoWriter(output_path, fourcc, final_fps, (width, height))
+            writer = cv2.VideoWriter(output_path, fourcc, fps, (width, height))
 
             if not writer.isOpened():
+                self.logger.error("Failed to open video writer")
                 return None
 
-            # İstenen süreye göre frame'leri ayarla
-            total_frames = len(frames)
-            frames_to_write = int(self.record_duration * final_fps)
-
-            if frames_to_write > total_frames:
-                # Frame'leri tekrarla (yetersiz frame varsa)
-                for i in range(frames_to_write):
-                    frame_index = i % total_frames
-                    writer.write(frames[frame_index])
-            else:
-                # Frame'leri düzenli aralıklarla seç (fazla frame varsa)
-                step = total_frames / frames_to_write
-                for i in range(frames_to_write):
-                    frame_index = int(i * step)
-                    writer.write(frames[frame_index])
+            for frame in frames:
+                # Her frame'i uint8'e dönüştür
+                if frame.dtype != np.uint8:
+                    frame = np.clip(frame, 0, 255).astype(np.uint8)
+                writer.write(frame)
 
             writer.release()
+            self.logger.info(f"Video saved successfully: {output_path}")
             return output_path if os.path.exists(output_path) else None
 
         except Exception as e:
@@ -162,9 +153,10 @@ class VideoSave(Component):
             return None
 
     def save_video(self, video_path):
+        """Save video to local or cloud"""
         try:
             _, ext = os.path.splitext(video_path)
-            video_filename = self.generate_filename(ext)
+            video_filename = self._generate_filename(ext)
 
             if self.target_type == "TargetLocal":
                 os.makedirs(self.local_path, exist_ok=True)
@@ -201,20 +193,17 @@ class VideoSave(Component):
             return None
 
     def process_and_save_video(self):
+        """Main function to process video and save it"""
         self.logger.info("VideoSave process started")
-        self.logger.info(f"Input frames: {len(self.input_frames)} | Duration: {self.record_duration}s | User FPS: {self.user_fps}")
-
-        if self.input_frames:
-            video_path = self.create_video_from_input_frames(self.input_frames)
+        frames = self.capture_input_frames()
+        if frames:
+            video_path = self.create_video_from_frames(frames, self.system_fps)
             if video_path:
-                self.saved_path = self.save_video(video_path)
-                if self.saved_path:
-                    self.logger.info("VideoSave process completed successfully")
+                self.logger.info("VideoSave process completed successfully")
 
     def run(self):
-
+        """Run the video save process"""
         self.image = Image.get_frame(img=self.image, redis_db=self.redis_db)
-
         self.process_and_save_video()
         packageModel = build_response(context=self)
         return packageModel
