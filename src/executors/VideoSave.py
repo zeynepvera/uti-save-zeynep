@@ -1,11 +1,7 @@
 import sys
 import os
-import uuid
-import shutil
 import datetime
-import time
 import logging
-import base64
 import numpy as np
 import cv2
 
@@ -30,11 +26,9 @@ class VideoSave(Component):
     start_time = None
     end_time = None  # NEW: to store end time
 
-
     def __init__(self, request, bootstrap):
 
         super().__init__(request, bootstrap)
-
 
         self.request.model = PackageModel(**(self.request.data))
 
@@ -44,14 +38,13 @@ class VideoSave(Component):
         self.image = self.request.get_param("inputImage")
 
         self.record_duration = self.request.get_param("recordDuration")
-        print(f"Record duration: {self.record_duration} saniye")
-
+        #print(f"Record duration: {self.record_duration} saniye")
 
         self.system_control = self.request.get_param("systemControl")
-        print(f"System Control: {self.system_control}")
+        #print(f"System Control: {self.system_control}")
 
         self.user_fps = self.request.get_param("configFps")
-        print(f"User FPS: {self.user_fps} ")
+        #print(f"User FPS: {self.user_fps} ")
 
 
         if isinstance(raw_target, dict):
@@ -66,8 +59,6 @@ class VideoSave(Component):
         self.logger = logging.getLogger(__name__)
 
         self.recording_complete = False
-
-
 
     @staticmethod
     def bootstrap(config: dict):
@@ -136,9 +127,7 @@ class VideoSave(Component):
             if VideoSave.start_time is None:
                 VideoSave.start_time = time.time()
 
-                used_fps = self.get_target_fps()
                 self.logger.info(f"Video recording started: '{self.title}'")
-                self.logger.info(f"FPS to be used: {used_fps:.2f}")
                 self.logger.info(f"Target duration: {self.record_duration} seconds")
 
             elapsed_time = time.time() - VideoSave.start_time
@@ -191,7 +180,6 @@ class VideoSave(Component):
 
                 writer.release()
 
-                # Log bilgileri
                 self.logger.info("-" * 50)
                 self.logger.info(f"Video kaydı tamamlandı: {output_path}")
                 self.logger.info(f"Toplam işlenen frame: {len(frames_in)}")
