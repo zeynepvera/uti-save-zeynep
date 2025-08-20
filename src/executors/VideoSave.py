@@ -34,12 +34,7 @@ class VideoSave(Component):
     def __init__(self, request, bootstrap):
 
         super().__init__(request, bootstrap)
-        # FPS için değişkenler
-        self.frame_count = 0
-        self.total_frames = 0
-        self.fps_start_time = time.time()
-        self.current_fps = 0.0
-        self.update_interval = 1.0
+
 
         self.request.model = PackageModel(**(self.request.data))
 
@@ -81,11 +76,8 @@ class VideoSave(Component):
 
     @staticmethod
     def _resample_frames(frames: list, target_count: int) -> list:
-        """
-        Eşit aralıklı yeniden örnekleme (frame drop/duplicate).
-        - İlk ve son frame mutlaka korunur.
-        - N < M ise çoğaltma (duplicate), N > M ise eleme (drop) yapılır.
-        """
+
+
         if not frames:
             return []
         n = len(frames)
@@ -100,71 +92,6 @@ class VideoSave(Component):
             idx = round(k * (n - 1) / (target_count - 1))
             resampled.append(frames[idx])
         return resampled
-
-    def update_fps(self):
-        """FPS hesaplama ve güncelleme"""
-        self.frame_count += 1
-        self.total_frames += 1
-        current_time = time.time()
-        elapsed = current_time - self.fps_start_time
-
-        if elapsed >= self.update_interval:
-            self.current_fps = self.frame_count / elapsed
-            self.frame_count = 0
-            self.fps_start_time = current_time
-            print(f"FPS güncellendi: {self.current_fps:.2f}")
-            print(f"Toplam işlenen frame: {self.total_frames}")
-        else:
-            print(f"Anlık frame sayısı: {self.frame_count}")
-            print(f"Toplam frame sayısı: {self.total_frames}")
-
-    def get_fps(self):
-        """Güncel FPS değerini döndür"""
-        return self.current_fps
-
-
-    def _target_output_fps(self) -> float:
-        """
-        Hedef FPS: kullanıcı verdiyse onu kullan; yoksa ölçülen FPS'e düş.
-        0 veya çok küçük değer gelirse 1.0'a sabitle.
-        """
-        try:
-            if self.user_fps is not None:
-                f = float(self.user_fps)
-                if f <= 0:
-                    return 1.0
-                return f
-        except Exception:
-            pass
-        # kullanıcı FPS vermediyse ya da parse edilemediyse ölçülen FPS'e bak
-        measured = VideoSave.fps_counter.get_fps()
-        return measured if measured and measured > 0 else 25.0  # güvenli varsayılan
-
-    """
-    def get_target_fps(self):
-        user_fps = float(self.user_fps) if self.user_fps else 0.0
-
-        # If user FPS is valid, use it (but not higher than real FPS)
-        if user_fps > 0:
-            # If we have start and end time, check real FPS
-            if VideoSave.start_time and VideoSave.end_time:
-                real_fps = len(VideoSave.frames) / max(0.01, VideoSave.end_time - VideoSave.start_time)
-                if user_fps > real_fps:
-                    self.logger.info(f"User FPS ({user_fps}) is higher than real FPS ({real_fps:.2f}), using real FPS.")
-                    return real_fps
-            self.logger.info(f"User FPS ({user_fps}) will be used.")
-            return user_fps
-
-        # If no user FPS, use real FPS
-        if VideoSave.start_time and VideoSave.end_time:
-            real_fps = len(VideoSave.frames) / max(0.01, VideoSave.end_time - VideoSave.start_time)
-            self.logger.info(f"Calculated real FPS: {real_fps:.2f}")
-            return real_fps if real_fps > 0 else 25.0
-
-        # Fallback
-        self.logger.info("Default FPS (25.0) will be used.")
-        return 25.0
-    """
 
     def get_target_fps(self):
 
@@ -204,9 +131,7 @@ class VideoSave(Component):
                     return False
 
 
-
             VideoSave.frames.append(current_frame)
-            # self.update_fps()
 
             if VideoSave.start_time is None:
                 VideoSave.start_time = time.time()
