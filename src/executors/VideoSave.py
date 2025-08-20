@@ -28,6 +28,8 @@ class VideoSave(Component):
     frames = []
     is_video_saved = False
     start_time = None
+    end_time = None  # NEW: to store end time
+
 
     def __init__(self, request, bootstrap):
 
@@ -138,37 +140,56 @@ class VideoSave(Component):
         measured = VideoSave.fps_counter.get_fps()
         return measured if measured and measured > 0 else 25.0  # güvenli varsayılan
 
+    """
     def get_target_fps(self):
-        """Kullanılacak FPS değerini belirler"""
-        system_fps = self.get_fps()
         user_fps = float(self.user_fps) if self.user_fps else 0.0
 
-        # Sistem FPS'i 0 veya çok düşükse varsayılan değer kullan
-        if system_fps <= 0:
-            system_fps = 25.0
-
-        # Kullanıcı FPS'i sistem FPS'inden büyükse sistem FPS'i kullan
-        if user_fps > system_fps:
-            self.logger.info(f"Kullanıcı FPS ({user_fps}) sistem FPS'inden ({system_fps}) büyük.")
-            self.logger.info(f"Sistem FPS ({system_fps}) kullanılacak.")
-            return system_fps
-
-        # Kullanıcı FPS'i geçerliyse onu kullan
+        # If user FPS is valid, use it (but not higher than real FPS)
         if user_fps > 0:
-            self.logger.info(f"Kullanıcı FPS ({user_fps}) kullanılacak.")
+            # If we have start and end time, check real FPS
+            if VideoSave.start_time and VideoSave.end_time:
+                real_fps = len(VideoSave.frames) / max(0.01, VideoSave.end_time - VideoSave.start_time)
+                if user_fps > real_fps:
+                    self.logger.info(f"User FPS ({user_fps}) is higher than real FPS ({real_fps:.2f}), using real FPS.")
+                    return real_fps
+            self.logger.info(f"User FPS ({user_fps}) will be used.")
             return user_fps
 
-        # Diğer durumlarda sistem FPS'i kullan
-        self.logger.info(f"Sistem FPS ({system_fps}) kullanılacak.")
-        return system_fps
+        # If no user FPS, use real FPS
+        if VideoSave.start_time and VideoSave.end_time:
+            real_fps = len(VideoSave.frames) / max(0.01, VideoSave.end_time - VideoSave.start_time)
+            self.logger.info(f"Calculated real FPS: {real_fps:.2f}")
+            return real_fps if real_fps > 0 else 25.0
 
+        # Fallback
+        self.logger.info("Default FPS (25.0) will be used.")
+        return 25.0
+    """
+
+    def get_target_fps(self):
+
+        print("self.frames:", len(self.frames))
+        print("self.record_duration:", self.record_duration)
+        real_fps=len(self.frames)/self.record_duration
+
+        if self.system_control == "True":
+            return real_fps
+
+        else:
+            if self.user_fps > real_fps:
+                self.logger.info(
+                    f"User FPS ({self.user_fps}) is higher than real FPS ({real_fps:.2f}), using real FPS.")
+                return real_fps
+            else:
+                self.logger.info(f"User FPS ({self.user_fps}) will be used.")
+                return self.user_fps
 
 
     def process_frame_db(self):
-        """Frame işleme ve video kayıt kontrolü"""
+        """Frame processing and video recording control."""
         try:
             if VideoSave.is_video_saved:
-                print("Video zaten kaydedildi, işlem yapılmıyor.")
+                print("Video already saved, skipping.")
                 return True
 
             current_frame = Image.get_frame(img=self.image, redis_db=self.redis_db)
@@ -179,37 +200,40 @@ class VideoSave(Component):
                 if hasattr(current_frame, 'value') and isinstance(current_frame.value, np.ndarray):
                     current_frame = current_frame.value
                 else:
-                    print("Frame numpy array'e dönüştürülemedi")
+                    print("Frame could not be converted to numpy array")
                     return False
+
+
+
+            VideoSave.frames.append(current_frame)
+            # self.update_fps()
 
             if VideoSave.start_time is None:
                 VideoSave.start_time = time.time()
 
-                used_fps = self.get_target_fps()  # veya VideoSave.fps gibi ayarladığın hedef FPS
-
-                self.logger.info(f"Video kaydı başlıyor: '{self.title}'")
-                self.logger.info(f"Kayıt için kullanılacak FPS: {used_fps:.2f}")
-                self.logger.info(f"Kayıt süresi hedefi: {self.record_duration} saniye")
-
-            VideoSave.frames.append(current_frame)
-            self.update_fps()  # FPS güncelleme
+                used_fps = self.get_target_fps()
+                self.logger.info(f"Video recording started: '{self.title}'")
+                self.logger.info(f"FPS to be used: {used_fps:.2f}")
+                self.logger.info(f"Target duration: {self.record_duration} seconds")
 
             elapsed_time = time.time() - VideoSave.start_time
             print("-" * 50)
-            print(f"Kayıt penceresi: {elapsed_time:.2f} / {self.record_duration} sn")
-            print(f"Toplanan frame: {len(VideoSave.frames)}")
+            print(f"Recording window: {elapsed_time:.2f} / {self.record_duration} s")
+            print(f"Collected frames: {len(VideoSave.frames)}")
             print("-" * 50)
 
             if elapsed_time >= self.record_duration and not VideoSave.is_video_saved:
+                VideoSave.end_time = time.time()  # NEW: set end time
                 self._finalize_and_save()
                 VideoSave.is_video_saved = True
                 VideoSave.start_time = None
+                VideoSave.end_time = None  # reset for next use
                 VideoSave.frames = []
 
             return True
 
         except Exception as e:
-            print(f"Frame işleme hatası: {str(e)}")
+            print(f"Frame processing error: {str(e)}")
             return False
 
     def _finalize_and_save(self):
@@ -221,6 +245,7 @@ class VideoSave(Component):
 
             # Kullanılacak FPS'i belirle
             target_fps = self.get_target_fps()
+            self.logger.info(f"Kullanılacak FPS: {target_fps:.2f}")
             target_count = max(1, int(round(self.record_duration * target_fps)))
             frames_out = self._resample_frames(frames_in, target_count)
 
