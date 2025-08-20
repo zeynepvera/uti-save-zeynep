@@ -1,7 +1,6 @@
-from pydantic import Field, ConfigDict, field_validator, BaseModel, validator
-from typing import Union, Literal, Union, List, Optional
-from sdks.novavision.src.base.model import Package, Configs, Inputs, Response, Request, Output, Input, Config, Image, \
-    Outputs
+from pydantic import Field, validator
+from typing import List, Optional, Union, Literal
+from sdks.novavision.src.base.model import Package, Image, Inputs, Configs, Outputs, Response, Request, Output, Input, Config
 
 
 class InputImage(Input):
@@ -20,17 +19,11 @@ class InputImage(Input):
     class Config:
         title = "Input Image"
 
-
-class CustomOutput(BaseModel):
-    name: str
-    value: str
-    type: str
-
-
 class OutputVideoUrl(Output):
     name: Literal["outputVideoUrl"] = "outputVideoUrl"
     value: str
     type: Literal["string"] = "string"
+
 
 
 class VideoSaveInputs(Inputs):
@@ -153,18 +146,18 @@ class VideoSaveConfigs(Configs):
 class VideoSaveRequest(Request):
     inputs: Optional[VideoSaveInputs]
     configs: VideoSaveConfigs
-    model_config = ConfigDict(
-        json_schema_extra={
+
+    class Config:
+        json_schema_extra = {
             "target": "configs"
         }
-    )
 
 
-class VideoSaveOutputs(BaseModel):
+class VideoSaveOutputs(Outputs):
     outputVideoUrl: OutputVideoUrl
 
 
-class VideoSaveResponse(BaseModel):
+class VideoSaveResponse(Response):
     outputs: VideoSaveOutputs
 
 
@@ -173,27 +166,27 @@ class VideoSave(Config):
     value: Union[VideoSaveRequest, VideoSaveResponse]
     type: Literal["object"] = "object"
     field: Literal["option"] = "option"
-    model_config = ConfigDict(
-        title="Video Save",
-        json_schema_extra={
+
+    class Config:
+        title = "VideoSave"
+        json_schema_extra = {
             "target": {
                 "value": 0
             }
         }
-    )
 
 
 class ConfigExecutor(Config):
     name: Literal["ConfigExecutor"] = "ConfigExecutor"
-    value: VideoSave
+    value: Union[VideoSave]
     type: Literal["executor"] = "executor"
     field: Literal["dependentDropdownlist"] = "dependentDropdownlist"
-    model_config = ConfigDict(
-        title="Task",
-        json_schema_extra={
+
+    class Config:
+        title = "Task"
+        json_schema_extra = {
             "target": "value"
         }
-    )
 
 
 class PackageConfigs(Configs):
@@ -204,4 +197,3 @@ class PackageModel(Package):
     configs: PackageConfigs
     type: Literal["component"] = "component"
     name: Literal["VideoSave"] = "VideoSave"
-    uID: str = Field(default="1221112")
